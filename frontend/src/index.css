@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-brand-primary: #1E3A8A;
+  --color-brand-accent: #2563EB;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #F5F7FA;
+  color: #111827;
+  overflow-x: hidden;
+}
+
+/* Custom Light Theme Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F5F7FA;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Base panel utility class for clean cards */
+.glass-panel {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  border-radius: 12px;
+  transition: all 0.2s ease-in-out;
+}
+
+.glass-panel-hover:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.02), 0 0 20px rgba(34, 211, 238, 0.15), 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  transform: translateY(-4px) scale(1.02);
+}
+
+/* Premium Gradient Button Class */
+.btn-premium {
+  background: linear-gradient(135deg, #2563EB 0%, #22D3EE 100%);
+  box-shadow: 0 4px 15px rgba(34, 211, 238, 0.3);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-premium:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.5);
+  background: linear-gradient(135deg, #3B82F6 0%, #38BDF8 100%);
+}
+
+.btn-premium::after {
+  content: "";
+  display: block;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, #fff 10%, transparent 10.01%);
+  background-repeat: no-repeat;
+  background-position: 50%;
+  transform: scale(10, 10);
+  opacity: 0;
+  transition: transform .5s, opacity 1s;
+}
+
+.btn-premium:active::after {
+  transform: scale(0, 0);
+  opacity: .3;
+  transition: 0s;
+}
