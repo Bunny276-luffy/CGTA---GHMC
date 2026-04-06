@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, increment } from 'firebase/firestore';
 import { Clock, CheckCircle, AlertCircle, MapPin, Search, Filter, X, ChevronRight, FileText, Image as ImageIcon, Calendar, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { t } from '../utils/translations';
@@ -11,6 +11,7 @@ const GrievanceList = ({ onReturn }) => {
     const [complaints, setComplaints] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    useEffect(() => { setError(''); }, [selectedIssue]);
 
     // Filtering State
     const [searchTerm, setSearchTerm] = useState('');
@@ -137,51 +138,24 @@ const GrievanceList = ({ onReturn }) => {
         );
     };
 
-    const handleCitizenConfirmation = async (complaintId, action) => {
-        try {
-            const complaintRef = doc(db, 'complaints', complaintId);
-
-            if (action === 'confirm') {
-                await updateDoc(complaintRef, {
-                    status: 'Closed',
-                    citizenConfirmed: true,
-                    updatedAt: serverTimestamp()
-                });
-
-                // Update local state to reflect change immediately
-                setComplaints(prev => prev.map(c =>
-                    c.id === complaintId ? { ...c, status: 'Closed', citizenConfirmed: true } : c
-                ));
-                setSelectedIssue(prev => ({ ...prev, status: 'Closed', citizenConfirmed: true }));
-
-            } else if (action === 'reject') {
-                const currentEscalation = selectedIssue.escalationLevel || 0;
-                const newEscalation = currentEscalation + 1;
-                
-                // Add to audit trail
-                const currentAudit = selectedIssue.auditTrail || [];
-                const newAudit = [...currentAudit, { action: 'Rejected Resolution', actor: auth?.currentUser?.uid || 'Citizen', timestamp: new Date().toISOString() }];
-
-                await updateDoc(complaintRef, {
-                    status: 'In Progress', // Send it back to work
-                    citizenConfirmed: false,
-                    escalationLevel: newEscalation,
-                    assignedRole: newEscalation > 1 ? 'zonal_commissioner' : 'field_officer',
-                    auditTrail: newAudit,
-                    updatedAt: serverTimestamp()
-                });
-
-                setComplaints(prev => prev.map(c =>
-                    c.id === complaintId ? { ...c, status: 'In Progress', citizenConfirmed: false, escalationLevel: newEscalation, assignedRole: newEscalation > 1 ? 'zonal_commissioner' : 'field_officer', auditTrail: newAudit } : c
-                ));
-                setSelectedIssue(prev => ({ ...prev, status: 'In Progress', citizenConfirmed: false, escalationLevel: newEscalation, assignedRole: newEscalation > 1 ? 'zonal_commissioner' : 'field_officer', auditTrail: newAudit }));
-            }
-        } catch (err) {
-            console.error("Failed to update status", err);
-            setError("Failed to update confirmation status.");
+const handleCitizenConfirmation = async (ticketId, action) => {
+    setError('');
+    try {
+        const ref = doc(db, 'complaints', ticketId);
+        if (action === 'confirm') {
+            await updateDoc(ref, { status: 'Closed', citizenConfirmed: true, closedAt: new Date() });
+            setSelectedIssue(prev => ({ ...prev, status: 'Closed' }));
+        } else {
+            const newCount = (selectedIssue?.rejectionCount ?? 0) + 1;
+            const newStatus = newCount >= 2 ? 'TPA_REVIEW' : 'Resolved';
+            await updateDoc(ref, { rejectionCount: newCount, status: newStatus });
+            setSelectedIssue(prev => ({ ...prev, rejectionCount: newCount, status: newStatus }));
         }
-    };
-
+    } catch (err) {
+        console.error('Firestore write error:', err.code, err.message);
+        setError('Failed to update: ' + err.message);
+    }
+};
     return (
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200 max-w-4xl mx-auto relative z-10 w-full mb-10">
             {/* Header */}

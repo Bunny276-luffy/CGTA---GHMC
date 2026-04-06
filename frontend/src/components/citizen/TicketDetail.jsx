@@ -6,48 +6,33 @@ import TicketTimeline from './TicketTimeline';
 
 export default function TicketDetail({ ticket, onBack, user }) {
     const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
 
     const isResolvedByOfficer = ticket.status === 'Resolved';
-    const isTPALocked = ticket.rejections >= 2;
+    const rejectionCount = ticket.rejectionCount ?? ticket.rejections ?? 0;
+    const isTPALocked = rejectionCount >= 2;
 
     const handleConfirm = async () => {
-        setSubmitting(true);
         try {
-            await updateDoc(doc(db, 'tickets', ticket.id), {
+            await updateDoc(doc(db, 'complaints', ticket.id), {
                 status: 'Closed',
-                closedAt: serverTimestamp(),
-                citizenConfirmed: true
+                citizenConfirmed: true,
+                closedAt: new Date()
             });
-            onBack();
-        } catch (error) {
-            console.error("Confirm error:", error);
-        } finally {
-            setSubmitting(false);
+        } catch (err) {
+            setError('Failed to update confirmation status.');
         }
     };
 
     const handleReject = async () => {
-        setSubmitting(true);
         try {
-            const nextRejections = (ticket.rejections || 0) + 1;
-            const updates = {
-                rejections: increment(1),
-                updatedAt: serverTimestamp()
-            };
-
-            // TPA Routing Logic
-            if (nextRejections >= 2) {
-                updates.status = 'TPA_REVIEW';
-            } else {
-                updates.status = 'In Progress'; // send back to field officer
-            }
-            
-            await updateDoc(doc(db, 'tickets', ticket.id), updates);
-            onBack();
-        } catch (error) {
-            console.error("Reject error:", error);
-        } finally {
-            setSubmitting(false);
+            const newCount = (ticket.rejectionCount ?? 0) + 1;
+            await updateDoc(doc(db, 'complaints', ticket.id), {
+                rejectionCount: newCount,
+                status: newCount >= 2 ? 'TPA_REVIEW' : 'Resolved'
+            });
+        } catch (err) {
+            setError('Failed to update confirmation status.');
         }
     };
 
@@ -56,6 +41,13 @@ export default function TicketDetail({ ticket, onBack, user }) {
             <button onClick={onBack} className="flex items-center gap-2 text-[var(--primary)] font-semibold hover:underline mb-6">
                 <ChevronLeft size={20} /> Back to Track Status
             </button>
+
+            {error && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm font-semibold p-3 rounded-lg mb-6">
+                    <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                    {error}
+                </div>
+            )}
 
             <div className="flex justify-between items-start mb-6 border-b border-[var(--border)] pb-6">
                 <div>
@@ -109,10 +101,13 @@ export default function TicketDetail({ ticket, onBack, user }) {
 
             {/* Validation / TPA Actions */}
             {isTPALocked ? (
-                <div className="mt-8 bg-purple-50 border border-purple-200 p-6 rounded-lg text-center flex flex-col items-center">
-                    <Scale size={32} className="text-purple-600 mb-3" />
-                    <h3 className="text-lg font-bold text-purple-900 mb-1 flex items-center gap-2">Escalated to Auditor (TPA)</h3>
-                    <p className="text-sm text-purple-700">This grievance has failed citizen validation twice. Control has been transferred to entirely neutral Third-Party Automation parameters for manual dispute resolution.</p>
+                <div className="mt-8 flex flex-col items-center gap-3">
+                    <span className="inline-flex items-center gap-2 bg-amber-100 text-amber-800 border border-amber-300 font-bold px-4 py-2 rounded-full text-sm">
+                        <Scale size={16} /> Escalated to Independent Auditor
+                    </span>
+                    <p className="text-sm text-gray-600 text-center max-w-md">
+                        Rejected twice. A neutral auditor will make the final decision.
+                    </p>
                 </div>
             ) : isResolvedByOfficer ? (
                 <div className="mt-8 bg-blue-50 border border-blue-200 p-6 rounded-lg">

@@ -284,6 +284,32 @@ const AdminDashboard = () => {
     const CHART_COLORS = ['#22D3EE', '#818CF8', '#A855F7', '#F472B6', '#34D399', '#FBBF24'];
     const PIE_COLORS = ['#F43F5E', '#10B981']; // Active (Pink/Red), Closed (Emerald)
 
+    // Predictive Decay: group by ward+category, flag 3+ tickets in 7 days
+    const computeDecayAlerts = () => {
+        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const recentComplaints = complaints.filter(c => {
+            const ts = c.createdAt?.toMillis ? c.createdAt.toMillis() : (c.createdAt ? Date.parse(c.createdAt) : null);
+            return ts && ts >= sevenDaysAgo;
+        });
+
+        // Group by ward (use address as ward key) + category
+        const groups = {};
+        recentComplaints.forEach(c => {
+            const ward = c.address || c.ward || 'Unknown Area';
+            const category = c.category || c.aiCategory || 'General';
+            const key = `${ward}||${category}`;
+            if (!groups[key]) groups[key] = { ward, category, count: 0 };
+            groups[key].count += 1;
+        });
+
+        return Object.values(groups)
+            .filter(g => g.count >= 3)
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 3);
+    };
+
+    const decayAlerts = computeDecayAlerts();
+
     return (
         <div className="p-4 md:p-8 max-w-[1400px] mx-auto min-h-screen relative z-10 text-gray-900">
             {/* Header */}
@@ -386,6 +412,31 @@ const AdminDashboard = () => {
                         transition={{ duration: 0.2 }}
                         className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm"
                     >
+                        {/* Predictive Decay Alerts */}
+                        {decayAlerts.length > 0 && (
+                            <div className="p-5 pb-2 space-y-2">
+                                {decayAlerts.map((alert, i) => (
+                                    <div
+                                        key={i}
+                                        style={{
+                                            background: '#FFFBEB',
+                                            borderLeft: '4px solid #D97706',
+                                            borderRadius: '8px',
+                                            padding: '12px 16px',
+                                            marginBottom: '8px',
+                                        }}
+                                    >
+                                        <div style={{ fontWeight: 700, color: '#B45309', fontSize: '14px', marginBottom: '2px' }}>
+                                            ⚠️ High Risk Zone Detected
+                                        </div>
+                                        <div style={{ color: '#6B7280', fontSize: '13px' }}>
+                                            &ldquo;{alert.ward}&rdquo; — {alert.count}+ <strong>{alert.category}</strong> complaints in 7 days. Possible infrastructure failure predicted.
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50 border-b border-gray-200">

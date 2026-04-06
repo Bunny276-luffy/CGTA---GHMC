@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Auth from './components/Auth';
 import CitizenDashboard from './components/CitizenDashboard';
 import AdminDashboard from './components/AdminDashboard';
+import OfficerDashboard from './components/officer/OfficerDashboard';
 import InteractiveBackground from './components/InteractiveBackground';
 import PublicStats from './components/PublicStats';
 import { useAuth } from './hooks/useAuth';
@@ -41,6 +42,12 @@ function App() {
           <Route path="/citizen" element={
             <ProtectedRoute requireRole="citizen">
               <CitizenDashboard />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/officer" element={
+            <ProtectedRoute requireRole="officer">
+              <OfficerDashboard />
             </ProtectedRoute>
           } />
 
