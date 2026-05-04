@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth, storage } from '../firebase';
-import { collection, query, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { signOut } from 'firebase/auth';
-import { LogOut, RefreshCw, CheckCircle, Clock, AlertCircle, Sparkles, Map as MapIcon, BarChart3, List as ListIcon, ShieldAlert, Image as ImageIcon, X, Loader2, Upload, AlertTriangle } from 'lucide-react';
+import { LogOut, RefreshCw, CheckCircle, Clock, AlertCircle, Sparkles, Map as MapIcon, BarChart3, List as ListIcon, ShieldAlert, Image as ImageIcon, X, Loader2, Upload, AlertTriangle, Scale } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -27,8 +27,10 @@ const AdminDashboard = () => {
     const [complaints, setComplaints] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [activeTab, setActiveTab] = useState('data'); // 'data', 'analytics', 'map'
+    const [activeTab, setActiveTab] = useState('data'); // 'data', 'analytics', 'map', 'tpa'
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [tpaTickets, setTpaTickets] = useState([]);
+    const [tpaLoading, setTpaLoading] = useState(false);
 
     // Resolution Modal State
     const [resolvingIssueId, setResolvingIssueId] = useState(null);
@@ -132,6 +134,23 @@ const AdminDashboard = () => {
 
     useEffect(() => {
         fetchAllComplaints();
+
+        // Fetch TPA disputed tickets
+        const fetchTpaTickets = async () => {
+            setTpaLoading(true);
+            try {
+                const q = query(collection(db, 'complaints'), where('status', '==', 'TPA_REVIEW'));
+                const snap = await getDocs(q);
+                const results = [];
+                snap.forEach(d => results.push({ id: d.id, ...d.data() }));
+                setTpaTickets(results);
+            } catch (err) {
+                console.error('TPA fetch failed:', err);
+            } finally {
+                setTpaLoading(false);
+            }
+        };
+        fetchTpaTickets();
     }, []);
 
     const handleUpdateStatus = async (complaintId, newStatus) => {
@@ -377,29 +396,23 @@ const AdminDashboard = () => {
             )}
 
             {/* Navigation Tabs */}
-            <div className="flex space-x-2 bg-white border border-gray-200 p-1.5 rounded-xl mb-8 w-full sm:max-w-md relative z-10 shadow-sm">
+            <div className="flex space-x-2 bg-white border border-gray-200 p-1.5 rounded-xl mb-8 w-full sm:max-w-3xl relative z-10 shadow-sm">
                 {[
                     { id: 'data', icon: ListIcon, label: 'Data Board' },
                     { id: 'analytics', icon: BarChart3, label: 'Analytics' },
-                    { id: 'map', icon: MapIcon, label: 'Live Map' }
+                    { id: 'map', icon: MapIcon, label: 'Live Map' },
+                    { id: 'tpa', icon: Scale, label: 'TPA Queue' }
                 ].map((tab) => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex-1 flex justify-center items-center py-2.5 rounded-lg text-sm font-bold transition-colors relative z-10 ${activeTab === tab.id ? 'text-[#1E3A8A]' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`flex-1 flex justify-center items-center py-2.5 rounded-lg text-sm font-bold transition-colors ${activeTab === tab.id ? 'bg-blue-50 text-[#1E3A8A] border border-blue-100' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                        {activeTab === tab.id && (
-                            <motion.div
-                                layoutId="activeTabBadge"
-                                className="absolute inset-0 bg-blue-50 rounded-lg border border-blue-100 -z-10"
-                                initial={false}
-                                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                            />
-                        )}
                         <tab.icon className="w-4 h-4 mr-2" /> {tab.label}
                     </button>
                 ))}
             </div>
+
 
             <AnimatePresence mode="wait">
                 {/* TAB: Data Table */}
@@ -641,6 +654,104 @@ const AdminDashboard = () => {
                                 )}
                             </MapContainer>
                         </div>
+                    </motion.div>
+                )}
+
+                {/* TAB: TPA Queue */}
+                {activeTab === 'tpa' && (
+                    <motion.div
+                        key="tpa"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        {tpaLoading ? (
+                            <div className="flex items-center justify-center py-20">
+                                <div className="w-10 h-10 border-4 border-gray-200 border-t-[#2563EB] rounded-full animate-spin"></div>
+                            </div>
+                        ) : tpaTickets.length === 0 ? (
+                            <div className="bg-white border border-gray-200 rounded-2xl p-16 text-center shadow-sm">
+                                <Scale className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                                <p className="text-gray-500 font-semibold text-lg">No disputed tickets. All clear.</p>
+                                <p className="text-gray-400 text-sm mt-1">No tickets are currently awaiting third-party arbitration.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                {tpaTickets.map(ticket => (
+                                    <div key={ticket.id} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                                        {/* Header */}
+                                        <div className="flex items-start justify-between mb-5">
+                                            <div>
+                                                <div className="font-mono text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded border border-gray-200 inline-block mb-1">
+                                                    {ticket.trackingId || ticket.id.slice(0, 8).toUpperCase()}
+                                                </div>
+                                                <h3 className="text-lg font-bold text-gray-900">{ticket.category || 'General'}</h3>
+                                            </div>
+                                            <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 uppercase tracking-wider flex items-center gap-1">
+                                                <Scale className="w-3 h-3" /> TPA Review
+                                            </span>
+                                        </div>
+
+                                        {/* Before / After Photos */}
+                                        <div className="grid grid-cols-2 gap-4 mb-5">
+                                            <div>
+                                                <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Before — Citizen Photo</p>
+                                                {ticket.imageUrl ? (
+                                                    <img src={ticket.imageUrl} alt="Before" className="w-full h-40 object-cover rounded-xl border border-gray-200 shadow-sm" />
+                                                ) : (
+                                                    <div className="w-full h-40 bg-gray-100 rounded-xl border border-dashed border-gray-300 flex items-center justify-center text-gray-400">
+                                                        <ImageIcon className="w-8 h-8" />
+                                                    </div>
+                                                )}
+                                                {ticket.latitude && ticket.longitude && (
+                                                    <p className="text-[11px] font-mono text-gray-400 mt-1">
+                                                        GPS: {Number(ticket.latitude).toFixed(5)}, {Number(ticket.longitude).toFixed(5)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">After — Officer Proof</p>
+                                                {ticket.resolutionEvidenceUrl ? (
+                                                    <img src={ticket.resolutionEvidenceUrl} alt="After" className="w-full h-40 object-cover rounded-xl border border-gray-200 shadow-sm" />
+                                                ) : (
+                                                    <div className="w-full h-40 bg-gray-100 rounded-xl border border-dashed border-gray-300 flex items-center justify-center text-gray-400">
+                                                        <ImageIcon className="w-8 h-8" />
+                                                    </div>
+                                                )}
+                                                {ticket.resolutionLat && ticket.resolutionLng && (
+                                                    <p className="text-[11px] font-mono text-gray-400 mt-1">
+                                                        GPS: {Number(ticket.resolutionLat).toFixed(5)}, {Number(ticket.resolutionLng).toFixed(5)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Action Buttons */}
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={async () => {
+                                                    await updateDoc(doc(db, 'complaints', ticket.id), { status: 'In Progress' });
+                                                    setTpaTickets(prev => prev.filter(t => t.id !== ticket.id));
+                                                }}
+                                                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors"
+                                            >
+                                                <AlertTriangle className="w-4 h-4" /> Reopen Ticket
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    await updateDoc(doc(db, 'complaints', ticket.id), { status: 'Closed', closedByTPA: true });
+                                                    setTpaTickets(prev => prev.filter(t => t.id !== ticket.id));
+                                                }}
+                                                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-colors"
+                                            >
+                                                <CheckCircle className="w-4 h-4" /> Force Close
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </motion.div>
                 )}
             </AnimatePresence>

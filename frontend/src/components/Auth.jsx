@@ -159,6 +159,14 @@ const Auth = () => {
                                             </button>
                                             <button
                                                 type="button"
+                                                className={`flex-1 flex justify-center items-center py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${role === 'officer' ? 'bg-white text-gray-900 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
+                                                onClick={() => setRole('officer')}
+                                                tabIndex={isLogin ? -1 : 0}
+                                            >
+                                                <Shield className="w-4 h-4 mr-2" /> Officer
+                                            </button>
+                                            <button
+                                                type="button"
                                                 className={`flex-1 flex justify-center items-center py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${role === 'admin' ? 'bg-white text-gray-900 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
                                                 onClick={() => setRole('admin')}
                                                 tabIndex={isLogin ? -1 : 0}

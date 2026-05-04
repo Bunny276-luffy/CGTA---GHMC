@@ -11,7 +11,6 @@ const GrievanceList = ({ onReturn }) => {
     const [complaints, setComplaints] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    useEffect(() => { setError(''); }, [selectedIssue]);
 
     // Filtering State
     const [searchTerm, setSearchTerm] = useState('');
@@ -23,6 +22,9 @@ const GrievanceList = ({ onReturn }) => {
     // Detail & Image Modal State
     const [selectedIssue, setSelectedIssue] = useState(null);
     const [enlargedImage, setEnlargedImage] = useState(null);
+
+    // Clear error when a new ticket is opened
+    useEffect(() => { setError(''); }, [selectedIssue])
 
     const categories = ["All", "Roads and Buildings", "Sanitation", "Water Supply", "Electricity", "Parks and Gardens", "General Administration"];
     const statuses = ["All", "New", "Pending", "In Progress", "Resolved", "Awaiting Citizen Confirmation", "Closed"];
@@ -138,24 +140,24 @@ const GrievanceList = ({ onReturn }) => {
         );
     };
 
-const handleCitizenConfirmation = async (ticketId, action) => {
-    setError('');
-    try {
-        const ref = doc(db, 'complaints', ticketId);
-        if (action === 'confirm') {
-            await updateDoc(ref, { status: 'Closed', citizenConfirmed: true, closedAt: new Date() });
-            setSelectedIssue(prev => ({ ...prev, status: 'Closed' }));
-        } else {
-            const newCount = (selectedIssue?.rejectionCount ?? 0) + 1;
-            const newStatus = newCount >= 2 ? 'TPA_REVIEW' : 'Resolved';
-            await updateDoc(ref, { rejectionCount: newCount, status: newStatus });
-            setSelectedIssue(prev => ({ ...prev, rejectionCount: newCount, status: newStatus }));
+    const handleCitizenConfirmation = async (ticketId, action) => {
+        setError('');
+        try {
+            const ticketRef = doc(db, 'complaints', ticketId);
+            if (action === 'confirm') {
+                await updateDoc(ticketRef, { status: 'Closed', citizenConfirmed: true, closedAt: new Date() });
+                setSelectedIssue(prev => ({ ...prev, status: 'Closed' }));
+            } else {
+                const newCount = (selectedIssue?.rejectionCount ?? 0) + 1;
+                const newStatus = newCount >= 2 ? 'TPA_REVIEW' : 'Resolved';
+                await updateDoc(ticketRef, { rejectionCount: newCount, status: newStatus });
+                setSelectedIssue(prev => ({ ...prev, rejectionCount: newCount, status: newStatus }));
+            }
+        } catch (err) {
+            console.error('Firestore error:', err.code, err.message);
+            setError('Failed to update: ' + err.message);
         }
-    } catch (err) {
-        console.error('Firestore write error:', err.code, err.message);
-        setError('Failed to update: ' + err.message);
-    }
-};
+    };
     return (
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-200 max-w-4xl mx-auto relative z-10 w-full mb-10">
             {/* Header */}

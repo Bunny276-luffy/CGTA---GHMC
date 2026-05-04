@@ -35,7 +35,7 @@ function App() {
 
           <Route path="/" element={
             <ProtectedRoute>
-              {role === 'admin' ? <Navigate to="/admin" /> : <Navigate to="/citizen" />}
+              {role === 'admin' ? <Navigate to="/admin" /> : role === 'officer' ? <Navigate to="/officer" /> : <Navigate to="/citizen" />}
             </ProtectedRoute>
           } />
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db, storage } from '../../firebase';
 import { signOut } from 'firebase/auth';
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, getDocs, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Map, UploadCloud, LogOut, AlertTriangle, CheckCircle, XCircle, Loader } from 'lucide-react';
 import exifr from 'exifr';
@@ -93,7 +93,7 @@ function UploadModal({ ticket, onClose, onSuccess }) {
             await uploadBytes(storageRef, file);
             const url = await getDownloadURL(storageRef);
 
-            await updateDoc(doc(db, 'tickets', ticket.id), {
+            await updateDoc(doc(db, 'complaints', ticket.id), {
                 status: 'Resolved',
                 resolutionPhotoUrl: url,
                 resolvedAt: serverTimestamp(),
@@ -120,9 +120,9 @@ function UploadModal({ ticket, onClose, onSuccess }) {
                 </button>
 
                 <h2 className="text-xl font-extrabold mb-1">Upload Resolution Photo</h2>
-                <p className="text-sm text-[var(--text-secondary)] mb-5">
+                <p className="text-sm text-gray-500 mb-5">
                     Ticket&nbsp;
-                    <span className="font-mono font-bold text-[var(--primary-dark)]">
+                    <span className="font-mono font-bold text-[#1E3A8A]">
                         {ticket.trackingId || ticket.id}
                     </span>
                 </p>
@@ -135,7 +135,7 @@ function UploadModal({ ticket, onClose, onSuccess }) {
                 )}
 
                 <div
-                    className="border-2 border-dashed border-[var(--border)] rounded-lg p-6 text-center bg-gray-50 hover:bg-gray-100 transition cursor-pointer mb-4 relative"
+                    className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center bg-gray-50 hover:bg-gray-100 transition cursor-pointer mb-4 relative"
                     onClick={() => inputRef.current?.click()}
                 >
                     <input
@@ -150,7 +150,7 @@ function UploadModal({ ticket, onClose, onSuccess }) {
                     ) : (
                         <>
                             <UploadCloud size={32} className="mx-auto mb-2 text-gray-400" />
-                            <p className="font-semibold text-sm text-[var(--text-primary)]">
+                            <p className="font-semibold text-sm text-gray-900">
                                 Click to select geotagged photo
                             </p>
                             <p className="text-xs text-gray-400 mt-1">Original JPEG/PNG with GPS EXIF</p>
@@ -181,18 +181,18 @@ function TicketCard({ ticket, onUpload }) {
             : 'Location not specified');
 
     return (
-        <div className="bg-white border border-[var(--border)] rounded-xl p-5 shadow-sm hover:shadow-md transition">
+        <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition">
             <div className="flex justify-between items-start mb-3">
                 <div>
-                    <h3 className="font-bold text-lg text-[var(--text-primary)]">{ticket.category || 'General'}</h3>
-                    <span className="font-mono text-xs bg-blue-50 text-[var(--primary-dark)] px-2 py-0.5 rounded font-bold">
+                    <h3 className="font-bold text-lg text-gray-900">{ticket.category || 'General'}</h3>
+                    <span className="font-mono text-xs bg-blue-50 text-[#1E3A8A] px-2 py-0.5 rounded font-bold">
                         {ticket.trackingId || ticket.id}
                     </span>
                 </div>
                 <SeverityBadge severity={ticket.severity} />
             </div>
 
-            <p className="text-sm text-[var(--text-secondary)] mb-4 flex items-start gap-1.5">
+            <p className="text-sm text-gray-500 mb-4 flex items-start gap-1.5">
                 <Map size={14} className="shrink-0 mt-0.5" />
                 {address}
             </p>
@@ -220,7 +220,7 @@ export default function OfficerDashboard() {
     useEffect(() => {
         if (!user) return;
         const q = query(
-            collection(db, 'tickets'),
+            collection(db, 'complaints'),
             where('assignedOfficer', '==', user.uid)
         );
         const unsub = onSnapshot(q, (snap) => {
@@ -253,6 +253,29 @@ export default function OfficerDashboard() {
         setTimeout(() => setSuccessMsg(''), 4000);
     };
 
+    const handleGetTestAssignment = async () => {
+        try {
+            // Find an unassigned ticket to use for testing
+            const q = query(collection(db, 'complaints'), where('status', 'in', ['New', 'Pending']), limit(1));
+            const snap = await getDocs(q);
+            if (snap.empty) {
+                alert("No new or pending complaints found in the database. Please create a new grievance from the Citizen portal first.");
+                return;
+            }
+            const ticketDoc = snap.docs[0];
+            await updateDoc(doc(db, 'complaints', ticketDoc.id), {
+                assignedOfficer: user.uid,
+                status: 'Assigned',
+                updatedAt: serverTimestamp()
+            });
+            setSuccessMsg("Test assignment retrieved successfully!");
+            setTimeout(() => setSuccessMsg(''), 4000);
+        } catch (err) {
+            console.error("Failed to assign test ticket:", err);
+            alert("Failed to fetch test assignment. Check console.");
+        }
+    };
+
     const active   = tickets.filter(t => t.status !== 'Resolved' && t.status !== 'Closed');
     const resolved = tickets.filter(t => t.status === 'Resolved' || t.status === 'Closed');
 
@@ -261,7 +284,7 @@ export default function OfficerDashboard() {
             key={id}
             onClick={() => setView(id)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-full font-semibold transition-colors mb-2
-                ${view === id ? 'bg-[var(--primary)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                ${view === id ? 'bg-[#1D4ED8] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
         >
             {icon} <span>{label}</span>
         </button>
@@ -278,17 +301,17 @@ export default function OfficerDashboard() {
                 />
             )}
 
-            <div className="min-h-screen flex bg-[var(--bg)] font-sans text-[var(--text-primary)]">
+            <div className="min-h-screen flex bg-gray-50 font-sans text-gray-900">
 
                 {/* ── Sidebar ─────────────────────────────────────────────── */}
-                <aside className="w-[220px] bg-[var(--sidebar-bg)] border-r border-[var(--border)] fixed inset-y-0 left-0 flex flex-col z-20">
+                <aside className="w-[220px] bg-white border-r border-gray-200 fixed inset-y-0 left-0 flex flex-col z-20">
                     <div className="p-6 flex items-center gap-3 mb-4">
-                        <div className="w-8 h-8 bg-[var(--warning)] rounded flex justify-center items-center text-white font-bold text-lg">
+                        <div className="w-8 h-8 bg-orange-500 rounded flex justify-center items-center text-white font-bold text-lg">
                             O
                         </div>
                         <div>
                             <h2 className="font-extrabold text-[#111827] leading-tight">CGTA</h2>
-                            <p className="text-[10px] uppercase font-bold text-[var(--text-secondary)] tracking-widest">Field Officer</p>
+                            <p className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">Field Officer</p>
                         </div>
                     </div>
 
@@ -297,7 +320,7 @@ export default function OfficerDashboard() {
                         {navBtn('upload',      <UploadCloud size={20} />, 'Upload Resolution')}
                     </nav>
 
-                    <div className="p-4 border-t border-[var(--border)]">
+                    <div className="p-4 border-t border-gray-200">
                         <button
                             onClick={handleLogout}
                             className="w-full flex items-center gap-3 px-4 py-3 text-red-600 font-semibold hover:bg-red-50 rounded-full transition"
@@ -310,12 +333,12 @@ export default function OfficerDashboard() {
                 {/* ── Main area ───────────────────────────────────────────── */}
                 <main className="flex-1 ml-[220px] flex flex-col min-h-screen">
                     {/* Topbar */}
-                    <header className="h-16 bg-white border-b border-[var(--border)] px-8 flex items-center justify-between sticky top-0 z-10">
+                    <header className="h-16 bg-white border-b border-gray-200 px-8 flex items-center justify-between sticky top-0 z-10">
                         <h1 className="text-xl font-bold">
                             {view === 'assignments' && 'My Assignments'}
                             {view === 'upload'      && 'Upload Resolution'}
                         </h1>
-                        <span className="text-sm text-[var(--text-secondary)] font-medium">
+                        <span className="text-sm text-gray-500 font-medium">
                             {user?.email}
                         </span>
                     </header>
@@ -339,9 +362,17 @@ export default function OfficerDashboard() {
                                 </h2>
 
                                 {active.length === 0 ? (
-                                    <div className="text-center py-16 text-gray-400 bg-white rounded-xl border border-dashed border-[var(--border)]">
-                                        <Map size={48} className="mx-auto mb-3 opacity-30" />
-                                        <p className="font-semibold">No active assignments right now.</p>
+                                    <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-200" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                                        <p className="text-xl font-bold text-gray-800 mb-6" style={{ color: '#1f2937' }}>
+                                            You currently have no assigned tickets.
+                                        </p>
+                                        <button 
+                                            onClick={handleGetTestAssignment}
+                                            className="px-8 py-3 bg-blue-600 text-white text-lg font-bold rounded-lg hover:bg-blue-700 shadow-md transition-all cursor-pointer"
+                                            style={{ backgroundColor: '#2563eb', color: '#ffffff' }}
+                                        >
+                                            Fetch a Test Ticket to Resolve
+                                        </button>
                                     </div>
                                 ) : (
                                     <div className="grid sm:grid-cols-2 gap-5 mb-10">
@@ -354,19 +385,19 @@ export default function OfficerDashboard() {
                                 {/* Resolved tickets */}
                                 {resolved.length > 0 && (
                                     <>
-                                        <h2 className="text-lg font-bold mb-4 text-[var(--text-secondary)]">
+                                        <h2 className="text-lg font-bold mb-4 text-gray-500">
                                             Completed ({resolved.length})
                                         </h2>
                                         <div className="grid sm:grid-cols-2 gap-5 opacity-60">
                                             {resolved.map(t => (
-                                                <div key={t.id} className="bg-white border border-[var(--border)] rounded-xl p-5 shadow-sm">
+                                                <div key={t.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
                                                     <div className="flex justify-between items-start mb-2">
-                                                        <h3 className="font-bold text-[var(--text-primary)]">{t.category}</h3>
+                                                        <h3 className="font-bold text-gray-900">{t.category}</h3>
                                                         <span className="badge bg-green-100 text-green-800 border border-green-200">
                                                             {t.status}
                                                         </span>
                                                     </div>
-                                                    <p className="font-mono text-xs text-[var(--primary-dark)]">{t.trackingId || t.id}</p>
+                                                    <p className="font-mono text-xs text-[#1E3A8A]">{t.trackingId || t.id}</p>
                                                 </div>
                                             ))}
                                         </div>
