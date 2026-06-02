@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import GrievanceForm from './GrievanceForm';
-import GrievanceList from './GrievanceList';
+import GrievanceList from './citizen/GrievanceList';
 import { db } from '../firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { PlusCircle, List, LogOut, LayoutDashboard, Clock, CheckCircle, AlertCircle, Menu, X, User, Bell, Globe } from 'lucide-react';

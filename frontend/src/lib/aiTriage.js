@@ -1,14 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
-
-// Initialize Anthropic client. Note: dangerouslyAllowBrowser is used for demo purposes.
-// In a production app, this should be executed in Firebase Cloud Functions to protect the API key.
-const anthropic = new Anthropic({
-    apiKey: import.meta.env.VITE_CLAUDE_API_KEY || "dummy-key-for-test",
-    dangerouslyAllowBrowser: true,
-});
-
 export async function processComplaintTriage(description) {
-    if (!import.meta.env.VITE_CLAUDE_API_KEY) {
+    const apiKey = import.meta.env.VITE_CLAUDE_API_KEY;
+    if (!apiKey) {
         // Fallback mockup if API key is not present
         return {
             category: "Other",
@@ -20,11 +12,19 @@ export async function processComplaintTriage(description) {
     }
 
     try {
-        const msg = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20241022",
-            max_tokens: 1024,
-            temperature: 0,
-            system: `You are an AI Triage Agent for CivicTrust, India's premier grievance platform. 
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-api-key": apiKey,
+                "anthropic-version": "2023-06-01",
+                "dangerously-allow-browser": "true"
+            },
+            body: JSON.stringify({
+                model: "claude-3-5-sonnet-20241022",
+                max_tokens: 1024,
+                temperature: 0,
+                system: `You are an AI Triage Agent for CivicTrust, India's premier grievance platform. 
 Read the complaint description and accurately classify it. 
 CRITICAL RULE: You MUST return a pure JSON object without markdown formatting or code blocks.
 The JSON object must match this schema exactly:
@@ -35,15 +35,17 @@ The JSON object must match this schema exactly:
   "estimatedSLAHours": number based on severity (Emergency:12, High:24, Medium:72, Low:168),
   "summary": "1-2 sentence maximum concise summary of the issue"
 }`,
-            messages: [
-                {
-                    role: "user",
-                    content: `Analyze this civic complaint:\n\n${description}`
-                }
-            ]
+                messages: [
+                    {
+                        role: "user",
+                        content: `Analyze this civic complaint:\n\n${description}`
+                    }
+                ]
+            })
         });
 
-        const rawJsonText = msg.content[0].text;
+        const data = await response.json();
+        const rawJsonText = data.content[0].text;
         const parsed = JSON.parse(rawJsonText);
         return parsed;
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Auth from './components/Auth';
-import CitizenDashboard from './components/CitizenDashboard';
+import CitizenDashboard from './components/citizen/CitizenDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import OfficerDashboard from './components/officer/OfficerDashboard';
 import InteractiveBackground from './components/InteractiveBackground';

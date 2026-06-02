@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../firebase';
+import { db, auth } from '../../firebase';
 import { collection, query, where, getDocs, doc, updateDoc, increment } from 'firebase/firestore';
 import { Clock, CheckCircle, AlertCircle, MapPin, Search, Filter, X, ChevronRight, FileText, Image as ImageIcon, Calendar, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { t } from '../utils/translations';
-import { useLanguage } from '../contexts/LanguageContext';
+import { t } from '../../utils/translations';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 const GrievanceList = ({ onReturn }) => {
     const { lang } = useLanguage();
