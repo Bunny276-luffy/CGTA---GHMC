@@ -10,7 +10,7 @@ import { calculateSLA } from '../../lib/slaEngine';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { X, Mic, MapPin, AlertTriangle, CheckCircle, Image as ImageIcon } from 'lucide-react';
+import { X, Mic, MapPin, AlertTriangle, CheckCircle, Image as ImageIcon, Loader } from 'lucide-react';
 
 const customMarker = new L.Icon({
     iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -38,6 +38,10 @@ export default function GrievanceForm({ user, onSuccess, onClose }) {
     const [isEmergency, setIsEmergency] = useState(false);
     const [dictating, setDictating] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
+
+    // Image verification state
+    const [imgVerifying, setImgVerifying] = useState(false);
+    const [imgVerification, setImgVerification] = useState(null); // null | result object
 
     const handleFile = async (e) => {
         const f = e.target.files[0];
@@ -67,6 +71,36 @@ export default function GrievanceForm({ user, onSuccess, onClose }) {
         setFile(f);
         const coords = await extractGPSFromImage(f);
         if (coords) setGPS(coords);
+
+        // Layer 3 – server-side EXIF / ELA / CLIP verification
+        verifyWithAPI(f);
+    };
+
+    /**
+     * Sends the file to the Python FastAPI backend for deep verification.
+     * Runs asynchronously after the file is accepted — never blocks UI.
+     * Silently skips if the API is unreachable.
+     */
+    const verifyWithAPI = async (f) => {
+        setImgVerification(null);
+        setImgVerifying(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', f);
+            const res = await fetch('http://localhost:8000/verify-image', {
+                method: 'POST',
+                body: formData,
+                signal: AbortSignal.timeout(30000), // 30-second hard limit
+            });
+            if (!res.ok) throw new Error(`API ${res.status}`);
+            const data = await res.json();
+            setImgVerification(data);
+        } catch {
+            // API unreachable or timed-out — silently allow submission
+            setImgVerification(null);
+        } finally {
+            setImgVerifying(false);
+        }
     };
 
     const runAutoDictate = () => {
@@ -118,7 +152,14 @@ export default function GrievanceForm({ user, onSuccess, onClose }) {
                 status: 'Submitted',
                 rejections: 0,
                 slaDeadline,
-                createdAt: serverTimestamp()
+                createdAt: serverTimestamp(),
+                // Server-side image verification result (null if API was unreachable)
+                imageVerification: imgVerification ? {
+                    trust_score: imgVerification.overall_trust_score,
+                    is_suspicious: imgVerification.is_suspicious,
+                    detected_category: imgVerification.detected_category,
+                    flags: imgVerification.flags ?? [],
+                } : null,
             });
 
             if(onSuccess) onSuccess();
@@ -214,6 +255,48 @@ export default function GrievanceForm({ user, onSuccess, onClose }) {
                             )}
                         </div>
                     </div>
+
+                    {/* ── Image Verification Status Panel ── */}
+                    {(imgVerifying || imgVerification) && (
+                        <div className={`rounded-lg px-4 py-3 text-sm font-semibold flex flex-col gap-1.5 border ${
+                            imgVerifying
+                                ? 'bg-blue-50 border-blue-200 text-blue-700'
+                                : (imgVerification?.is_suspicious || imgVerification?.overall_trust_score < 0.6)
+                                    ? 'bg-amber-50 border-amber-300 text-amber-800'
+                                    : 'bg-green-50 border-green-200 text-green-700'
+                        }`}>
+                            {imgVerifying ? (
+                                <span className="flex items-center gap-2">
+                                    <Loader size={15} className="animate-spin" />
+                                    Verifying image…
+                                </span>
+                            ) : (imgVerification?.is_suspicious || imgVerification?.overall_trust_score < 0.6) ? (
+                                <>
+                                    <span className="flex items-center gap-2">
+                                        <AlertTriangle size={15} />
+                                        ⚠ Image Flagged — submission allowed, but will be reviewed by TPA.
+                                    </span>
+                                    {imgVerification?.flags?.length > 0 && (
+                                        <ul className="list-disc list-inside text-xs font-normal space-y-0.5 ml-1 opacity-90">
+                                            {imgVerification.flags.map((flag, i) => (
+                                                <li key={i}>{flag}</li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </>
+                            ) : (
+                                <span className="flex items-center gap-2">
+                                    <CheckCircle size={15} />
+                                    ✓ Image Verified
+                                    {imgVerification?.detected_category && (
+                                        <span className="ml-1 bg-green-100 text-green-800 text-[10px] uppercase font-bold px-2 py-0.5 rounded">
+                                            {imgVerification.detected_category}
+                                        </span>
+                                    )}
+                                </span>
+                            )}
+                        </div>
+                    )}
 
                     <div>
                         <label className="label-text flex justify-between items-end">
