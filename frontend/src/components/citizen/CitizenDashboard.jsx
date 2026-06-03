@@ -4,7 +4,7 @@ import { auth, db } from '../../firebase';
 import { signOut } from 'firebase/auth';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { LogOut, LayoutDashboard, PlusCircle, List, Bell, User } from 'lucide-react';
+import { LogOut, LayoutDashboard, PlusCircle, List, FileText, Bell, User } from 'lucide-react';
 import GrievanceForm from './GrievanceForm';
 import TicketList from './TicketList';
 import TicketDetail from './TicketDetail';
