@@ -4,16 +4,10 @@ import { auth, db } from '../../firebase';
 import { signOut } from 'firebase/auth';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { LogOut, LayoutDashboard, PlusCircle, List, FileText, Bell, User } from 'lucide-react';
+import { LogOut, LayoutDashboard, PlusCircle, FileText, Bell, User } from 'lucide-react';
 import GrievanceForm from './GrievanceForm';
 import TicketList from './TicketList';
 import TicketDetail from './TicketDetail';
-
-const ShieldIcon = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-    </svg>
-);
 
 export default function CitizenDashboard() {
     const { t } = useLanguage();
@@ -48,54 +42,53 @@ export default function CitizenDashboard() {
     };
 
     return (
-        <div className="min-h-screen flex bg-[#F5F7FA] font-sans text-[var(--text-primary)]">
+        <div className="min-h-screen flex bg-[var(--bg)] font-sans text-[var(--text-primary)]">
             
-            {/* Sidebar */}
-            <aside className="w-64 bg-white border-r border-gray-200 fixed inset-y-0 left-0 flex flex-col z-20">
-                <div className="flex flex-col h-full p-6">
-                    <div className="flex items-center space-x-3 mb-10 pb-4 border-b border-gray-100">
-                        <div className="w-10 h-10 rounded-lg bg-[#1E3A8A] border border-[#1E3A8A] flex items-center justify-center">
-                            <ShieldIcon className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                            <h2 className="text-xl font-bold text-gray-900 tracking-tight">CGTA</h2>
-                        </div>
+            {/* Sidebar (220px fixed) */}
+            <aside className="w-[220px] bg-[var(--sidebar-bg)] border-r border-[var(--border)] fixed inset-y-0 left-0 flex flex-col z-20">
+                <div className="p-6 flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 bg-[var(--primary-dark)] rounded flex justify-center items-center text-white font-bold text-lg">
+                        C
                     </div>
-
-                    <nav className="flex-1 space-y-1.5">
-                        <button 
-                            onClick={() => { setView('overview'); setSelectedTicket(null); }}
-                            className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors font-medium text-sm ${view === 'overview' ? 'bg-[#2563EB] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-                        >
-                            <LayoutDashboard className={`w-5 h-5 mr-3 ${view === 'overview' ? 'text-white' : 'text-gray-400'}`} /> Dashboard Overview
-                        </button>
-                        <button 
-                            onClick={() => { setView('report'); setSelectedTicket(null); }}
-                            className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors font-medium text-sm ${view === 'report' ? 'bg-[#2563EB] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-                        >
-                            <PlusCircle className={`w-5 h-5 mr-3 ${view === 'report' ? 'text-white' : 'text-gray-400'}`} /> Report Issue
-                        </button>
-                        <button 
-                            onClick={() => { setView('track'); setSelectedTicket(null); }}
-                            className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors font-medium text-sm ${view === 'track' || view === 'detail' ? 'bg-[#2563EB] text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-                        >
-                            <List className={`w-5 h-5 mr-3 ${view === 'track' || view === 'detail' ? 'text-white' : 'text-gray-400'}`} /> Track Status
-                        </button>
-                    </nav>
-
-                    <div className="pt-6 border-t border-gray-200 mt-auto">
-                        <button onClick={handleLogout} className="flex items-center px-4 py-3 text-gray-600 hover:text-red-700 hover:bg-red-50 rounded-lg w-full transition-colors font-medium text-sm">
-                            <LogOut className="w-5 h-5 mr-3 text-gray-400 group-hover:text-red-600" /> Logout
-                        </button>
+                    <div>
+                        <h2 className="font-extrabold text-[#111827] leading-tight">CGTA</h2>
+                        <p className="text-[10px] uppercase font-bold text-[var(--text-secondary)] tracking-widest">Citizen Portal</p>
                     </div>
+                </div>
+
+                <nav className="flex-1 px-4">
+                    <button 
+                        onClick={() => { setView('overview'); setSelectedTicket(null); }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-full font-semibold transition-colors mb-2 ${view === 'overview' ? 'bg-[var(--primary)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                    >
+                        <LayoutDashboard size={20} /> <span>Dashboard</span>
+                    </button>
+                    <button 
+                        onClick={() => { setView('report'); setSelectedTicket(null); }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-full font-semibold transition-colors mb-2 ${view === 'report' ? 'bg-[var(--primary)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                    >
+                        <PlusCircle size={20} /> <span>Report Issue</span>
+                    </button>
+                    <button 
+                        onClick={() => { setView('track'); setSelectedTicket(null); }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-full font-semibold transition-colors mb-2 ${view === 'track' || view === 'detail' ? 'bg-[var(--primary)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                    >
+                        <FileText size={20} /> <span>Track Status</span>
+                    </button>
+                </nav>
+
+                <div className="p-4 border-t border-[var(--border)]">
+                    <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-red-600 font-semibold hover:bg-red-50 rounded-full transition">
+                        <LogOut size={20} /> Logout
+                    </button>
                 </div>
             </aside>
 
             {/* Main Layout Area */}
-            <main className="flex-1 ml-64 flex flex-col min-h-screen">
+            <main className="flex-1 ml-[220px] flex flex-col min-h-screen">
                 {/* Topbar */}
-                <header className="h-16 bg-white border-b border-gray-200 px-8 flex items-center justify-between sticky top-0 z-10">
-                    <h1 className="text-xl font-bold text-gray-900 tracking-tight">
+                <header className="h-16 bg-white border-b border-[var(--border)] px-8 flex items-center justify-between sticky top-0 z-10">
+                    <h1 className="text-xl font-bold">
                         {view === 'overview' && 'Dashboard Overview'}
                         {view === 'report' && 'Report New Issue'}
                         {view === 'track' && 'Track Active Status'}
@@ -111,7 +104,7 @@ export default function CitizenDashboard() {
                             <Bell size={20} />
                             {stats.actionRequired > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></span>}
                         </button>
-                        <button className="flex items-center gap-2 bg-gray-50 border border-gray-200 px-4 py-1.5 rounded-full hover:bg-gray-100 transition">
+                        <button className="flex items-center gap-2 bg-gray-50 border border-[var(--border)] px-4 py-1.5 rounded-full hover:bg-gray-100 transition">
                             <User size={16} className="text-gray-500"/>
                             <span className="text-sm font-semibold">Citizen Profile</span>
                         </button>
