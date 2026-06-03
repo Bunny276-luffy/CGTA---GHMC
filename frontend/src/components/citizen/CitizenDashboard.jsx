@@ -146,14 +146,20 @@ export default function CitizenDashboard() {
 
                             {/* Action Cards */}
                             <div className="grid grid-cols-2 gap-8 mt-8">
-                                <button onClick={() => setView('report')} className="card-flat hover:border-[var(--primary)] transition flex flex-col items-center justify-center text-center p-12 group cursor-pointer border hover:shadow-md">
+                                <button
+                                    onClick={() => setView('report')}
+                                    className="card-flat hover:border-[var(--primary)] transition flex flex-col items-center justify-center text-center p-12 group cursor-pointer border hover:shadow-md rounded-2xl"
+                                >
                                     <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-[var(--primary)] mb-4 group-hover:scale-110 transition">
                                         <PlusCircle size={32} />
                                     </div>
                                     <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Report a New Issue</h3>
                                     <p className="text-[var(--text-secondary)]">Log a new GPS-verified civic complaint</p>
                                 </button>
-                                <button onClick={() => setView('track')} className="card-flat hover:border-[var(--primary)] transition flex flex-col items-center justify-center text-center p-12 group cursor-pointer border hover:shadow-md">
+                                <button
+                                    onClick={() => setView('track')}
+                                    className="card-flat hover:border-[var(--primary)] transition flex flex-col items-center justify-center text-center p-12 group cursor-pointer border hover:shadow-md rounded-2xl"
+                                >
                                     <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-[var(--primary)] mb-4 group-hover:scale-110 transition">
                                         <FileText size={32} />
                                     </div>
