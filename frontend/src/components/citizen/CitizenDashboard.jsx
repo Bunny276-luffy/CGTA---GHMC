@@ -112,61 +112,66 @@ export default function CitizenDashboard() {
                 <div className="p-8 flex-1 overflow-auto">
                     {/* Overview View */}
                     {view === 'overview' && (
-                        <div className="max-w-5xl mx-auto">
-                            
-                            {stats.actionRequired > 0 && (
-                                <div className="bg-blue-50 border-l-4 border-[var(--primary)] p-4 rounded-r-lg mb-8 flex justify-between items-center shadow-sm">
-                                    <div>
-                                        <h3 className="text-blue-900 font-bold mb-1">Action Required</h3>
-                                        <p className="text-sm text-blue-800">You have {stats.actionRequired} pending verifications. Officers have uploaded resolution proofs.</p>
-                                    </div>
-                                    <button onClick={() => setView('track')} className="btn-primary py-1.5 px-4 text-sm text-white">Review Validations</button>
-                                </div>
-                            )}
+                        <div className="max-w-5xl mx-auto space-y-8">
 
-                            {/* 4 Stat Cards */}
-                            <div className="grid grid-cols-4 gap-6 mb-8">
-                                <div className="card-flat p-5 border-t-4 border-t-[var(--primary)] border-x-0 border-b-0 shadow border border-[var(--border)] relative pt-6 text-center">
-                                    <div className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-wider mb-2">Total Complaints</div>
-                                    <div className="text-4xl font-extrabold text-[var(--primary)]">{stats.total}</div>
+                            {/* Welcome Banner */}
+                            <div className="rounded-2xl bg-gradient-to-r from-[#1E3A8A] to-[#2563EB] p-6 flex items-center justify-between shadow-lg">
+                                <div>
+                                    <h2 className="text-white text-2xl font-extrabold mb-1">Welcome to CGTA Citizen Portal</h2>
+                                    <p className="text-blue-100 text-sm font-medium">Track, report and monitor civic issues in your area.</p>
                                 </div>
-                                <div className="card-flat p-5 border-t-4 border-t-[var(--warning)] border-x-0 border-b-0 shadow border border-[var(--border)] relative pt-6 text-center">
-                                    <div className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-wider mb-2">Pending</div>
-                                    <div className="text-4xl font-extrabold text-[var(--warning)]">{stats.pending}</div>
+                                <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
+                                    <LayoutDashboard size={32} className="text-white" />
                                 </div>
-                                <div className="card-flat p-5 border-t-4 border-t-[var(--primary-dark)] border-x-0 border-b-0 shadow border border-[var(--border)] relative pt-6 text-center">
-                                    <div className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-wider mb-2">In Progress</div>
-                                    <div className="text-4xl font-extrabold text-[var(--primary-dark)]">{stats.inProgress}</div>
+                            </div>
+
+                            {/* Stat Cards */}
+                            <div className="grid grid-cols-4 gap-5">
+                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col items-center text-center hover:shadow-md transition">
+                                    <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Total Complaints</div>
+                                    <div className="text-4xl font-extrabold text-[#2563EB]">{stats.total}</div>
                                 </div>
-                                <div className="card-flat p-5 border-t-4 border-t-[var(--accent-green)] border-x-0 border-b-0 shadow border border-[var(--border)] relative pt-6 text-center">
-                                    <div className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-wider mb-2">Resolved</div>
-                                    <div className="text-4xl font-extrabold text-[var(--accent-green)]">{stats.resolved}</div>
+                                <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-5 flex flex-col items-center text-center hover:shadow-md transition">
+                                    <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Pending</div>
+                                    <div className="text-4xl font-extrabold text-amber-500">{stats.pending}</div>
+                                </div>
+                                <div className="bg-white rounded-2xl border border-blue-200 shadow-sm p-5 flex flex-col items-center text-center hover:shadow-md transition">
+                                    <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">In Progress</div>
+                                    <div className="text-4xl font-extrabold text-[#1E3A8A]">{stats.inProgress}</div>
+                                </div>
+                                <div className="bg-white rounded-2xl border border-green-200 shadow-sm p-5 flex flex-col items-center text-center hover:shadow-md transition">
+                                    <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Resolved</div>
+                                    <div className="text-4xl font-extrabold text-emerald-500">{stats.resolved}</div>
                                 </div>
                             </div>
 
                             {/* Action Cards */}
-                            <div className="grid grid-cols-2 gap-8 mt-8">
+                            <div className="grid grid-cols-2 gap-6">
                                 <button
                                     onClick={() => setView('report')}
-                                    className="card-flat hover:border-[var(--primary)] transition flex flex-col items-center justify-center text-center p-12 group cursor-pointer border hover:shadow-md rounded-2xl"
+                                    className="bg-white border-2 border-gray-200 hover:border-[#2563EB] hover:shadow-lg rounded-2xl p-10 flex flex-col items-center justify-center text-center group transition-all duration-200 cursor-pointer"
                                 >
-                                    <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-[var(--primary)] mb-4 group-hover:scale-110 transition">
-                                        <PlusCircle size={32} />
+                                    <div className="w-16 h-16 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-[#2563EB] mb-5 group-hover:scale-110 group-hover:bg-[#2563EB] group-hover:text-white transition-all duration-200">
+                                        <PlusCircle size={30} />
                                     </div>
-                                    <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Report a New Issue</h3>
-                                    <p className="text-[var(--text-secondary)]">Log a new GPS-verified civic complaint</p>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-2">Report a New Issue</h3>
+                                    <p className="text-sm text-gray-500 font-medium">Log a new GPS-verified civic complaint</p>
+                                    <span className="mt-4 text-xs font-bold text-[#2563EB] uppercase tracking-widest group-hover:underline">Get Started →</span>
                                 </button>
+
                                 <button
                                     onClick={() => setView('track')}
-                                    className="card-flat hover:border-[var(--primary)] transition flex flex-col items-center justify-center text-center p-12 group cursor-pointer border hover:shadow-md rounded-2xl"
+                                    className="bg-white border-2 border-gray-200 hover:border-[#2563EB] hover:shadow-lg rounded-2xl p-10 flex flex-col items-center justify-center text-center group transition-all duration-200 cursor-pointer"
                                 >
-                                    <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-[var(--primary)] mb-4 group-hover:scale-110 transition">
-                                        <FileText size={32} />
+                                    <div className="w-16 h-16 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-[#2563EB] mb-5 group-hover:scale-110 group-hover:bg-[#2563EB] group-hover:text-white transition-all duration-200">
+                                        <FileText size={30} />
                                     </div>
-                                    <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Track Active Status</h3>
-                                    <p className="text-[var(--text-secondary)]">Review ongoing fixes and auditor escalations</p>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-2">Track Active Status</h3>
+                                    <p className="text-sm text-gray-500 font-medium">Review ongoing fixes and auditor escalations</p>
+                                    <span className="mt-4 text-xs font-bold text-[#2563EB] uppercase tracking-widest group-hover:underline">View All →</span>
                                 </button>
                             </div>
+
                         </div>
                     )}
 
