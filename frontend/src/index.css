@@ -1,3 +1,16 @@
+:root {
+  --primary: #2563EB;
+  --primary-dark: #1E3A8A;
+  --bg: #F5F7FA;
+  --sidebar-bg: #FFFFFF;
+  --border: #E5E7EB;
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --warning: #F59E0B;
+  --accent-green: #10B981;
+  --card-bg: #FFFFFF;
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
@@ -89,4 +102,24 @@ body {
   transform: scale(0, 0);
   opacity: .3;
   transition: 0s;
+}
+
+.card-flat {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 16px;
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-primary {
+  background: #2563EB;
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover {
+  background: #1D4ED8;
 }
