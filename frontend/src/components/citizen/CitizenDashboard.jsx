@@ -1,32 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth, db } from '../../firebase';
+import { auth } from '../../firebase';
 import { signOut } from 'firebase/auth';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LogOut, LayoutDashboard, PlusCircle, FileText, Bell, User } from 'lucide-react';
 import GrievanceForm from './GrievanceForm';
-import TicketList from './TicketList';
-import TicketDetail from './TicketDetail';
+import GrievanceList from './GrievanceList';
 
 export default function CitizenDashboard() {
     const { t } = useLanguage();
     const navigate = useNavigate();
     const user = auth.currentUser;
     const [view, setView] = useState('overview'); // overview, report, track, detail
-    const [tickets, setTickets] = useState([]);
-    const [selectedTicket, setSelectedTicket] = useState(null);
-
-    useEffect(() => {
-        if (!user) return;
-        const q = query(collection(db, 'tickets'), where('userId', '==', user.uid));
-        const unsub = onSnapshot(q, (snap) => {
-            let res = [];
-            snap.forEach(doc => res.push({id: doc.id, ...doc.data()}));
-            setTickets(res);
-        });
-        return () => unsub();
-    }, [user]);
 
     const handleLogout = async () => {
         await signOut(auth);
@@ -34,11 +19,11 @@ export default function CitizenDashboard() {
     };
 
     const stats = {
-        total: tickets.length,
-        pending: tickets.filter(t => t.status === 'Submitted' || t.status === 'Assigned').length,
-        inProgress: tickets.filter(t => t.status === 'In Progress').length,
-        resolved: tickets.filter(t => t.status === 'Resolved' || t.status === 'Closed').length,
-        actionRequired: tickets.filter(t => t.status === 'Resolved' && t.rejections < 2).length
+        total: 0,
+        pending: 0,
+        inProgress: 0,
+        resolved: 0,
+        actionRequired: 0
     };
 
     return (
@@ -58,19 +43,19 @@ export default function CitizenDashboard() {
 
                 <nav className="flex-1 px-4">
                     <button 
-                        onClick={() => { setView('overview'); setSelectedTicket(null); }}
+                        onClick={() => { setView('overview'); }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-full font-semibold transition-colors mb-2 ${view === 'overview' ? 'bg-[var(--primary)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
                         <LayoutDashboard size={20} /> <span>Dashboard</span>
                     </button>
                     <button 
-                        onClick={() => { setView('report'); setSelectedTicket(null); }}
+                        onClick={() => { setView('report'); }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-full font-semibold transition-colors mb-2 ${view === 'report' ? 'bg-[var(--primary)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
                         <PlusCircle size={20} /> <span>Report Issue</span>
                     </button>
                     <button 
-                        onClick={() => { setView('track'); setSelectedTicket(null); }}
+                        onClick={() => setView('track')}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-full font-semibold transition-colors mb-2 ${view === 'track' || view === 'detail' ? 'bg-[var(--primary)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
                         <FileText size={20} /> <span>Track Status</span>
@@ -174,15 +159,7 @@ export default function CitizenDashboard() {
                     )}
 
                     {view === 'track' && (
-                        <div className="max-w-5xl mx-auto">
-                            <TicketList tickets={tickets} onViewDetail={t => { setSelectedTicket(t); setView('detail'); }} />
-                        </div>
-                    )}
-
-                    {view === 'detail' && selectedTicket && (
-                        <div className="max-w-4xl mx-auto">
-                            <TicketDetail ticket={selectedTicket} onBack={() => setView('track')} user={user} />
-                        </div>
+                        <GrievanceList onReturn={() => setView('overview')} />
                     )}
 
                 </div>
