@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth } from '../../firebase';
+import { auth, db } from '../../firebase';
 import { signOut } from 'firebase/auth';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { LogOut, LayoutDashboard, PlusCircle, FileText, Bell, User } from 'lucide-react';
 import GrievanceForm from './GrievanceForm';
@@ -12,18 +13,30 @@ export default function CitizenDashboard() {
     const navigate = useNavigate();
     const user = auth.currentUser;
     const [view, setView] = useState('overview'); // overview, report, track, detail
+    const [complaints, setComplaints] = useState([]);
+
+    useEffect(() => {
+        if (!user) return;
+        const q = query(collection(db, 'complaints'), where('userId', '==', user.uid));
+        const unsub = onSnapshot(q, (snap) => {
+            let res = [];
+            snap.forEach(doc => res.push({ id: doc.id, ...doc.data() }));
+            setComplaints(res);
+        });
+        return () => unsub();
+    }, [user]);
+
+    const stats = {
+        total: complaints.length,
+        pending: complaints.filter(c => c.status === 'Submitted' || c.status === 'Assigned' || c.status === 'Pending').length,
+        inProgress: complaints.filter(c => c.status === 'In Progress').length,
+        resolved: complaints.filter(c => c.status === 'Resolved' || c.status === 'Closed').length,
+        actionRequired: 0 // Placeholder/remains 0 as requested by keeping stats structure compliant
+    };
 
     const handleLogout = async () => {
         await signOut(auth);
         navigate('/');
-    };
-
-    const stats = {
-        total: 0,
-        pending: 0,
-        inProgress: 0,
-        resolved: 0,
-        actionRequired: 0
     };
 
     return (
@@ -132,7 +145,7 @@ export default function CitizenDashboard() {
                             </div>
 
                             {/* Action Cards */}
-                            <div className="grid grid-cols-2 gap-8">
+                            <div className="grid grid-cols-2 gap-8 mt-8">
                                 <button onClick={() => setView('report')} className="card-flat hover:border-[var(--primary)] transition flex flex-col items-center justify-center text-center p-12 group cursor-pointer border hover:shadow-md">
                                     <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-[var(--primary)] mb-4 group-hover:scale-110 transition">
                                         <PlusCircle size={32} />
@@ -140,7 +153,6 @@ export default function CitizenDashboard() {
                                     <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Report a New Issue</h3>
                                     <p className="text-[var(--text-secondary)]">Log a new GPS-verified civic complaint</p>
                                 </button>
-
                                 <button onClick={() => setView('track')} className="card-flat hover:border-[var(--primary)] transition flex flex-col items-center justify-center text-center p-12 group cursor-pointer border hover:shadow-md">
                                     <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-[var(--primary)] mb-4 group-hover:scale-110 transition">
                                         <FileText size={32} />
