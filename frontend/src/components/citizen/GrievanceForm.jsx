@@ -259,7 +259,7 @@ export default function GrievanceForm({ user, onSuccess, onClose }) {
 
                     {/* ── Image Verification Status Panel ── */}
                     {(imgVerifying || imgVerification) && (
-                        <div className={`rounded-lg px-4 py-3 text-sm font-semibold flex flex-col gap-1.5 border ${
+                        <div className={`rounded-lg px-4 py-3 text-sm font-semibold flex flex-col gap-2 border ${
                             imgVerifying
                                 ? 'bg-blue-50 border-blue-200 text-blue-700'
                                 : (imgVerification?.is_suspicious || imgVerification?.overall_trust_score < 0.6)
@@ -271,30 +271,67 @@ export default function GrievanceForm({ user, onSuccess, onClose }) {
                                     <Loader size={15} className="animate-spin" />
                                     Verifying image…
                                 </span>
-                            ) : (imgVerification?.is_suspicious || imgVerification?.overall_trust_score < 0.6) ? (
-                                <>
-                                    <span className="flex items-center gap-2">
-                                        <AlertTriangle size={15} />
-                                        ⚠ Image Flagged — submission allowed, but will be reviewed by TPA.
-                                    </span>
-                                    {imgVerification?.flags?.length > 0 && (
-                                        <ul className="list-disc list-inside text-xs font-normal space-y-0.5 ml-1 opacity-90">
-                                            {imgVerification.flags.map((flag, i) => (
-                                                <li key={i}>{flag}</li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </>
                             ) : (
-                                <span className="flex items-center gap-2">
-                                    <CheckCircle size={15} />
-                                    ✓ Image Verified
-                                    {imgVerification?.detected_category && (
-                                        <span className="ml-1 bg-green-100 text-green-800 text-[10px] uppercase font-bold px-2 py-0.5 rounded">
-                                            {imgVerification.detected_category}
+                                <>
+                                    {(imgVerification?.is_suspicious || imgVerification?.overall_trust_score < 0.6) ? (
+                                        <>
+                                            <span className="flex items-center gap-2">
+                                                <AlertTriangle size={15} />
+                                                ⚠ Image Flagged — submission allowed, but will be reviewed by TPA.
+                                            </span>
+                                            {imgVerification?.flags?.length > 0 && (
+                                                <ul className="list-disc list-inside text-xs font-normal space-y-0.5 ml-1 opacity-90">
+                                                    {imgVerification.flags.map((flag, i) => (
+                                                        <li key={i}>{flag}</li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <span className="flex items-center gap-2">
+                                            <CheckCircle size={15} />
+                                            ✓ Image Verified
+                                            {imgVerification?.detected_category && (
+                                                <span className="ml-1 bg-green-100 text-green-800 text-[10px] uppercase font-bold px-2 py-0.5 rounded">
+                                                    {imgVerification.detected_category}
+                                                </span>
+                                            )}
                                         </span>
                                     )}
-                                </span>
+
+                                    {/* Trust Meter UI */}
+                                    {imgVerification?.trust_level && (
+                                        <div className="mt-2 pt-2 border-t border-black/5 flex flex-col gap-1.5 text-xs text-gray-800">
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-bold">Trust Level:</span>
+                                                <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-extrabold border ${
+                                                    imgVerification.trust_level === 'HIGH'
+                                                        ? 'bg-green-100 text-green-800 border-green-200'
+                                                        : imgVerification.trust_level === 'MEDIUM'
+                                                            ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                                                            : 'bg-red-100 text-red-800 border-red-200'
+                                                }`}>
+                                                    {imgVerification.trust_level}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="w-12 font-bold">{imgVerification.trust_percentage}%</span>
+                                                <div className="flex-1 bg-black/10 rounded-full h-2 overflow-hidden">
+                                                    <div 
+                                                        className={`h-full rounded-full transition-all duration-500 ${
+                                                            imgVerification.trust_level === 'HIGH'
+                                                                ? 'bg-green-500'
+                                                                : imgVerification.trust_level === 'MEDIUM'
+                                                                    ? 'bg-yellow-500'
+                                                                    : 'bg-red-500'
+                                                        }`}
+                                                        style={{ width: `${imgVerification.trust_percentage}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     )}
