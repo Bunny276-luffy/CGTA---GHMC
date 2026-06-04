@@ -87,6 +87,7 @@ export default function GrievanceForm({ user, onSuccess, onClose }) {
         try {
             const formData = new FormData();
             formData.append('file', f);
+            formData.append('complaint_address', gps ? `${gps.lat},${gps.lng}` : '');
             const res = await fetch('http://localhost:8000/verify-image', {
                 method: 'POST',
                 body: formData,
