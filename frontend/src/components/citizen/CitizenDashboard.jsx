@@ -3,40 +3,42 @@ import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase';
 import { signOut } from 'firebase/auth';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { useLanguage } from '../../contexts/LanguageContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 import { LogOut, LayoutDashboard, PlusCircle, FileText, Bell, User } from 'lucide-react';
 import GrievanceForm from './GrievanceForm';
-import GrievanceList from './GrievanceList';
+import TicketList from './TicketList';
+import TicketDetail from './TicketDetail';
 
 export default function CitizenDashboard() {
     const { t } = useLanguage();
     const navigate = useNavigate();
     const user = auth.currentUser;
     const [view, setView] = useState('overview'); // overview, report, track, detail
-    const [complaints, setComplaints] = useState([]);
+    const [tickets, setTickets] = useState([]);
+    const [selectedTicket, setSelectedTicket] = useState(null);
 
     useEffect(() => {
         if (!user) return;
-        const q = query(collection(db, 'complaints'), where('userId', '==', user.uid));
+        const q = query(collection(db, 'tickets'), where('userId', '==', user.uid));
         const unsub = onSnapshot(q, (snap) => {
             let res = [];
-            snap.forEach(doc => res.push({ id: doc.id, ...doc.data() }));
-            setComplaints(res);
+            snap.forEach(doc => res.push({id: doc.id, ...doc.data()}));
+            setTickets(res);
         });
         return () => unsub();
     }, [user]);
 
-    const stats = {
-        total: complaints.length,
-        pending: complaints.filter(c => c.status === 'Submitted' || c.status === 'Assigned' || c.status === 'Pending').length,
-        inProgress: complaints.filter(c => c.status === 'In Progress').length,
-        resolved: complaints.filter(c => c.status === 'Resolved' || c.status === 'Closed').length,
-        actionRequired: 0 // Placeholder/remains 0 as requested by keeping stats structure compliant
-    };
-
     const handleLogout = async () => {
         await signOut(auth);
         navigate('/');
+    };
+
+    const stats = {
+        total: tickets.length,
+        pending: tickets.filter(t => t.status === 'Submitted' || t.status === 'Assigned').length,
+        inProgress: tickets.filter(t => t.status === 'In Progress').length,
+        resolved: tickets.filter(t => t.status === 'Resolved' || t.status === 'Closed').length,
+        actionRequired: tickets.filter(t => t.status === 'Resolved' && t.rejections < 2).length
     };
 
     return (
@@ -56,19 +58,19 @@ export default function CitizenDashboard() {
 
                 <nav className="flex-1 px-4">
                     <button 
-                        onClick={() => { setView('overview'); }}
+                        onClick={() => { setView('overview'); setSelectedTicket(null); }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-full font-semibold transition-colors mb-2 ${view === 'overview' ? 'bg-[var(--primary)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
                         <LayoutDashboard size={20} /> <span>Dashboard</span>
                     </button>
                     <button 
-                        onClick={() => { setView('report'); }}
+                        onClick={() => { setView('report'); setSelectedTicket(null); }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-full font-semibold transition-colors mb-2 ${view === 'report' ? 'bg-[var(--primary)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
                         <PlusCircle size={20} /> <span>Report Issue</span>
                     </button>
                     <button 
-                        onClick={() => setView('track')}
+                        onClick={() => { setView('track'); setSelectedTicket(null); }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-full font-semibold transition-colors mb-2 ${view === 'track' || view === 'detail' ? 'bg-[var(--primary)] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
                     >
                         <FileText size={20} /> <span>Track Status</span>
@@ -112,66 +114,56 @@ export default function CitizenDashboard() {
                 <div className="p-8 flex-1 overflow-auto">
                     {/* Overview View */}
                     {view === 'overview' && (
-                        <div className="max-w-5xl mx-auto space-y-8">
+                        <div className="max-w-5xl mx-auto">
+                            
+                            {stats.actionRequired > 0 && (
+                                <div className="bg-blue-50 border-l-4 border-[var(--primary)] p-4 rounded-r-lg mb-8 flex justify-between items-center shadow-sm">
+                                    <div>
+                                        <h3 className="text-blue-900 font-bold mb-1">Action Required</h3>
+                                        <p className="text-sm text-blue-800">You have {stats.actionRequired} pending verifications. Officers have uploaded resolution proofs.</p>
+                                    </div>
+                                    <button onClick={() => setView('track')} className="btn-primary py-1.5 px-4 text-sm text-white">Review Validations</button>
+                                </div>
+                            )}
 
-                            {/* Welcome Banner */}
-                            <div className="rounded-2xl bg-gradient-to-r from-[#1E3A8A] to-[#2563EB] p-6 flex items-center justify-between shadow-lg">
-                                <div>
-                                    <h2 className="text-white text-2xl font-extrabold mb-1">Welcome to CGTA Citizen Portal</h2>
-                                    <p className="text-blue-100 text-sm font-medium">Track, report and monitor civic issues in your area.</p>
+                            {/* 4 Stat Cards */}
+                            <div className="grid grid-cols-4 gap-6 mb-8">
+                                <div className="card-flat p-5 border-t-4 border-t-[var(--primary)] border-x-0 border-b-0 shadow border border-[var(--border)] relative pt-6 text-center">
+                                    <div className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-wider mb-2">Total Complaints</div>
+                                    <div className="text-4xl font-extrabold text-[var(--primary)]">{stats.total}</div>
                                 </div>
-                                <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
-                                    <LayoutDashboard size={32} className="text-white" />
+                                <div className="card-flat p-5 border-t-4 border-t-[var(--warning)] border-x-0 border-b-0 shadow border border-[var(--border)] relative pt-6 text-center">
+                                    <div className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-wider mb-2">Pending</div>
+                                    <div className="text-4xl font-extrabold text-[var(--warning)]">{stats.pending}</div>
                                 </div>
-                            </div>
-
-                            {/* Stat Cards */}
-                            <div className="grid grid-cols-4 gap-5">
-                                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 flex flex-col items-center text-center hover:shadow-md transition">
-                                    <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Total Complaints</div>
-                                    <div className="text-4xl font-extrabold text-[#2563EB]">{stats.total}</div>
+                                <div className="card-flat p-5 border-t-4 border-t-[var(--primary-dark)] border-x-0 border-b-0 shadow border border-[var(--border)] relative pt-6 text-center">
+                                    <div className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-wider mb-2">In Progress</div>
+                                    <div className="text-4xl font-extrabold text-[var(--primary-dark)]">{stats.inProgress}</div>
                                 </div>
-                                <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-5 flex flex-col items-center text-center hover:shadow-md transition">
-                                    <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Pending</div>
-                                    <div className="text-4xl font-extrabold text-amber-500">{stats.pending}</div>
-                                </div>
-                                <div className="bg-white rounded-2xl border border-blue-200 shadow-sm p-5 flex flex-col items-center text-center hover:shadow-md transition">
-                                    <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">In Progress</div>
-                                    <div className="text-4xl font-extrabold text-[#1E3A8A]">{stats.inProgress}</div>
-                                </div>
-                                <div className="bg-white rounded-2xl border border-green-200 shadow-sm p-5 flex flex-col items-center text-center hover:shadow-md transition">
-                                    <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Resolved</div>
-                                    <div className="text-4xl font-extrabold text-emerald-500">{stats.resolved}</div>
+                                <div className="card-flat p-5 border-t-4 border-t-[var(--accent-green)] border-x-0 border-b-0 shadow border border-[var(--border)] relative pt-6 text-center">
+                                    <div className="text-[var(--text-secondary)] text-xs font-bold uppercase tracking-wider mb-2">Resolved</div>
+                                    <div className="text-4xl font-extrabold text-[var(--accent-green)]">{stats.resolved}</div>
                                 </div>
                             </div>
 
                             {/* Action Cards */}
-                            <div className="grid grid-cols-2 gap-6">
-                                <button
-                                    onClick={() => setView('report')}
-                                    className="bg-white border-2 border-gray-200 hover:border-[#2563EB] hover:shadow-lg rounded-2xl p-10 flex flex-col items-center justify-center text-center group transition-all duration-200 cursor-pointer"
-                                >
-                                    <div className="w-16 h-16 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-[#2563EB] mb-5 group-hover:scale-110 group-hover:bg-[#2563EB] group-hover:text-white transition-all duration-200">
-                                        <PlusCircle size={30} />
+                            <div className="grid grid-cols-2 gap-8">
+                                <button onClick={() => setView('report')} className="card-flat hover:border-[var(--primary)] transition flex flex-col items-center justify-center text-center p-12 group cursor-pointer border hover:shadow-md">
+                                    <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-[var(--primary)] mb-4 group-hover:scale-110 transition">
+                                        <PlusCircle size={32} />
                                     </div>
-                                    <h3 className="text-xl font-bold text-gray-900 mb-2">Report a New Issue</h3>
-                                    <p className="text-sm text-gray-500 font-medium">Log a new GPS-verified civic complaint</p>
-                                    <span className="mt-4 text-xs font-bold text-[#2563EB] uppercase tracking-widest group-hover:underline">Get Started →</span>
+                                    <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Report a New Issue</h3>
+                                    <p className="text-[var(--text-secondary)]">Log a new GPS-verified civic complaint</p>
                                 </button>
 
-                                <button
-                                    onClick={() => setView('track')}
-                                    className="bg-white border-2 border-gray-200 hover:border-[#2563EB] hover:shadow-lg rounded-2xl p-10 flex flex-col items-center justify-center text-center group transition-all duration-200 cursor-pointer"
-                                >
-                                    <div className="w-16 h-16 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-[#2563EB] mb-5 group-hover:scale-110 group-hover:bg-[#2563EB] group-hover:text-white transition-all duration-200">
-                                        <FileText size={30} />
+                                <button onClick={() => setView('track')} className="card-flat hover:border-[var(--primary)] transition flex flex-col items-center justify-center text-center p-12 group cursor-pointer border hover:shadow-md">
+                                    <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center text-[var(--primary)] mb-4 group-hover:scale-110 transition">
+                                        <FileText size={32} />
                                     </div>
-                                    <h3 className="text-xl font-bold text-gray-900 mb-2">Track Active Status</h3>
-                                    <p className="text-sm text-gray-500 font-medium">Review ongoing fixes and auditor escalations</p>
-                                    <span className="mt-4 text-xs font-bold text-[#2563EB] uppercase tracking-widest group-hover:underline">View All →</span>
+                                    <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Track Active Status</h3>
+                                    <p className="text-[var(--text-secondary)]">Review ongoing fixes and auditor escalations</p>
                                 </button>
                             </div>
-
                         </div>
                     )}
 
@@ -182,7 +174,15 @@ export default function CitizenDashboard() {
                     )}
 
                     {view === 'track' && (
-                        <GrievanceList onReturn={() => setView('overview')} />
+                        <div className="max-w-5xl mx-auto">
+                            <TicketList tickets={tickets} onViewDetail={t => { setSelectedTicket(t); setView('detail'); }} />
+                        </div>
+                    )}
+
+                    {view === 'detail' && selectedTicket && (
+                        <div className="max-w-4xl mx-auto">
+                            <TicketDetail ticket={selectedTicket} onBack={() => setView('track')} user={user} />
+                        </div>
                     )}
 
                 </div>
