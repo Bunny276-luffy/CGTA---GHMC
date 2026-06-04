@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase';
 import { signOut } from 'firebase/auth';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { useLanguage } from '../../i18n/LanguageContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { LogOut, LayoutDashboard, PlusCircle, FileText, Bell, User } from 'lucide-react';
 import GrievanceForm from './GrievanceForm';
 import TicketList from './TicketList';
