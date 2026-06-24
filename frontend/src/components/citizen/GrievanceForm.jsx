@@ -173,11 +173,8 @@ export default function GrievanceForm({ user, onSuccess, onClose }) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex justify-center items-center bg-black/60 pt-10 pb-10 overflow-auto">
-            <div className="card-flat w-full max-w-2xl relative my-auto">
-                <button onClick={onSuccess || onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
-                    <X size={24} />
-                </button>
+        <div className="w-full max-w-2xl mx-auto bg-white rounded-2xl border border-gray-200 p-6 md:p-8 shadow-xs">
+            <div>
                 
                 <div className="mb-6">
                     <h2 className="text-2xl font-extrabold mb-1">Report Issue</h2>
@@ -306,10 +303,10 @@ export default function GrievanceForm({ user, onSuccess, onClose }) {
                                                 <span className="font-bold">Trust Level:</span>
                                                 <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-extrabold border ${
                                                     imgVerification.trust_level === 'HIGH'
-                                                        ? 'bg-green-100 text-green-800 border-green-200'
+                                                        ? 'bg-green-50 text-green-700 border-green-200'
                                                         : imgVerification.trust_level === 'MEDIUM'
-                                                            ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                                                            : 'bg-red-100 text-red-800 border-red-200'
+                                                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                            : 'bg-red-50 text-red-700 border-red-200'
                                                 }`}>
                                                     {imgVerification.trust_level}
                                                 </span>
@@ -320,10 +317,10 @@ export default function GrievanceForm({ user, onSuccess, onClose }) {
                                                     <div 
                                                         className={`h-full rounded-full transition-all duration-500 ${
                                                             imgVerification.trust_level === 'HIGH'
-                                                                ? 'bg-green-500'
+                                                                ? 'bg-green-600'
                                                                 : imgVerification.trust_level === 'MEDIUM'
-                                                                    ? 'bg-yellow-500'
-                                                                    : 'bg-red-500'
+                                                                    ? 'bg-amber-600'
+                                                                    : 'bg-red-600'
                                                         }`}
                                                         style={{ width: `${imgVerification.trust_percentage}%` }}
                                                     />

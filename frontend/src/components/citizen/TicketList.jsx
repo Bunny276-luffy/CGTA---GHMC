@@ -15,34 +15,32 @@ export default function TicketList({ tickets, onViewDetail }) {
 
     const getSeverityBadge = (severity) => {
         const s = severity?.toUpperCase();
-        if (s === 'EMERGENCY') return 'bg-red-100 text-red-800';
-        if (s === 'CRITICAL') return 'bg-orange-100 text-orange-800';
-        if (s === 'MEDIUM') return 'bg-yellow-100 text-yellow-800';
-        return 'bg-green-100 text-green-800';
+        if (s === 'EMERGENCY' || s === 'CRITICAL') return 'bg-red-50 text-red-700 border border-red-200';
+        if (s === 'MEDIUM') return 'bg-amber-50 text-amber-700 border border-amber-200';
+        return 'bg-green-50 text-green-700 border border-green-200';
     };
 
     const getStatusBadge = (status) => {
         const s = status?.toUpperCase();
-        if (s === 'SUBMITTED' || s === 'PENDING') return 'bg-amber-100 text-amber-800 border-amber-200';
-        if (s === 'IN PROGRESS') return 'bg-blue-100 text-blue-800 border-blue-200';
-        if (s === 'ASSIGNED') return 'bg-transparent text-blue-600 border-blue-600 border';
-        if (s === 'RESOLVED' || s === 'CLOSED') return 'bg-green-100 text-green-800 border-green-200';
-        if (s === 'SLA_BREACHED') return 'bg-transparent text-red-600 border-red-600 border';
-        if (s === 'TPA_REVIEW') return 'bg-purple-100 text-purple-800 border-purple-200';
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        if (s === 'SUBMITTED' || s === 'PENDING') return 'bg-amber-50 text-amber-700 border border-amber-200';
+        if (s === 'IN PROGRESS' || s === 'ASSIGNED') return 'bg-blue-50 text-blue-700 border border-blue-200';
+        if (s === 'RESOLVED' || s === 'CLOSED') return 'bg-green-50 text-green-700 border border-green-200';
+        if (s === 'SLA_BREACHED') return 'bg-red-50 text-red-700 border border-red-200';
+        if (s === 'TPA_REVIEW') return 'bg-purple-50 text-purple-700 border border-purple-200';
+        return 'bg-gray-50 text-gray-700 border border-gray-200';
     };
 
     return (
-        <div className="w-full bg-white rounded-xl shadow-sm border border-[var(--border)] min-h-[500px]">
+        <div className="w-full bg-white rounded-2xl shadow-xs border border-gray-100 min-h-[500px] overflow-hidden">
             {/* Header */}
-            <div className="p-6 border-b border-[var(--border)] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="p-6 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-gray-50/50">
                 <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-extrabold text-[var(--text-primary)]">Complaint Overview</h2>
-                    <Info size={18} className="text-[var(--text-secondary)]" />
+                    <h2 className="text-xl font-bold text-gray-900">Complaint Overview</h2>
+                    <Info size={16} className="text-gray-400" />
                 </div>
                 
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                    <div className="relative w-full md:w-64">
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+                    <div className="relative w-full sm:w-64">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <Search size={16} className="text-gray-400" />
                         </div>
@@ -55,9 +53,9 @@ export default function TicketList({ tickets, onViewDetail }) {
                         />
                     </div>
                     
-                    <div className="relative">
+                    <div className="relative w-full sm:w-auto shrink-0">
                         <select 
-                            className="input-field h-10 pr-8 appearance-none bg-gray-50 border-[var(--border)] font-semibold text-sm"
+                            className="input-field h-10 pr-8 appearance-none bg-white font-semibold text-sm cursor-pointer"
                             value={filterStatus}
                             onChange={(e) => setFilterStatus(e.target.value)}
                         >
@@ -68,13 +66,13 @@ export default function TicketList({ tickets, onViewDetail }) {
                             <option value="Resolved">Resolved</option>
                             <option value="TPA_REVIEW">TPA Review</option>
                         </select>
-                        <Filter size={14} className="absolute right-3 top-3 text-[var(--text-secondary)] pointer-events-none" />
+                        <Filter size={14} className="absolute right-3 top-3.5 text-gray-400 pointer-events-none" />
                     </div>
 
                     {(searchTerm || filterStatus !== 'All') && (
                         <button 
                             onClick={() => { setSearchTerm(''); setFilterStatus('All'); }}
-                            className="text-sm font-semibold text-[var(--danger)] hover:underline flex items-center gap-1 shrink-0"
+                            className="text-sm font-semibold text-[var(--danger)] hover:underline flex items-center gap-1 shrink-0 mt-2 sm:mt-0"
                         >
                             <X size={14} /> Clear
                         </button>
@@ -85,10 +83,10 @@ export default function TicketList({ tickets, onViewDetail }) {
             {/* List Body */}
             <div className="p-6">
                 {filteredTickets.length === 0 ? (
-                    <div className="text-center py-12 text-gray-500">
+                    <div className="text-center py-16 text-gray-500">
                         <Filter size={48} className="mx-auto mb-4 text-gray-300" />
-                        <h3 className="font-bold text-[var(--text-primary)] text-lg">No Grievances Found</h3>
-                        <p className="text-sm">Try adjusting your filters or submitting a new issue.</p>
+                        <h3 className="font-bold text-gray-900 text-lg">No Grievances Found</h3>
+                        <p className="text-sm text-gray-500 mt-1">Try adjusting your filters or submitting a new issue.</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-4">
@@ -96,43 +94,43 @@ export default function TicketList({ tickets, onViewDetail }) {
                             <div 
                                 key={ticket.id} 
                                 onClick={() => onViewDetail(ticket)}
-                                className="border border-[var(--border)] rounded-lg p-5 hover:shadow-md transition cursor-pointer hover:border-gray-300 bg-white"
+                                className="border border-gray-100 rounded-2xl p-5 md:p-6 hover:shadow-md transition-all duration-300 cursor-pointer hover:border-blue-200 bg-white"
                             >
-                                <div className="flex justify-between items-start mb-3">
-                                    <div className="flex items-center gap-3 flex-wrap">
-                                        <span className="font-bold text-lg text-[var(--text-primary)]">{ticket.category}</span>
+                                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4">
+                                    <div className="flex items-center gap-2.5 flex-wrap">
+                                        <span className="font-extrabold text-base md:text-lg text-gray-900">{ticket.category}</span>
                                         <span className={`badge ${getSeverityBadge(ticket.severity)}`}>
                                             {ticket.severity || 'NORMAL'}
                                         </span>
-                                        <span className={`badge border ${getStatusBadge(ticket.status)}`}>
+                                        <span className={`badge ${getStatusBadge(ticket.status)}`}>
                                             {ticket.status === 'Submitted' ? 'PENDING' : ticket.status}
                                         </span>
                                         {ticket.rejections >= 2 && (
-                                            <span className="badge bg-purple-100 text-purple-800 border border-purple-200">
+                                            <span className="badge bg-purple-50 text-purple-700 border border-purple-200">
                                                 ESCALATED TO TPA
                                             </span>
                                         )}
                                     </div>
-                                    <div className="font-mono text-sm font-bold text-[var(--primary-dark)] bg-blue-50 px-2 py-1 rounded">
+                                    <div className="font-mono text-xs font-bold text-[var(--primary)] bg-blue-50 px-2.5 py-1 rounded-lg self-start sm:self-auto">
                                         {ticket.trackingId || 'GHMC-XXXX-XXXX'}
                                     </div>
                                 </div>
 
                                 <div className="mb-4">
-                                    <p className="text-sm text-[var(--text-primary)] line-clamp-2">
-                                        <span className="font-semibold text-gray-700 mr-2">AI Synopsis:</span>
+                                    <p className="text-sm text-gray-600 line-clamp-2">
+                                        <span className="font-bold text-gray-900 mr-2">AI Synopsis:</span>
                                         {ticket.aiSynopsis || ticket.description}
                                     </p>
                                 </div>
 
-                                <div className="flex justify-between items-end border-t border-[var(--border)] pt-4 mt-2">
-                                    <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] font-medium">
-                                        <MapPin size={16} />
+                                <div className="flex justify-between items-center border-t border-gray-50 pt-4 mt-2">
+                                    <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
+                                        <MapPin size={14} />
                                         <span>GPS: {ticket.location?.lat?.toFixed(4)}, {ticket.location?.lng?.toFixed(4)}</span>
                                     </div>
-                                    <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] font-medium">
-                                        <Calendar size={16} />
-                                        <span>{ticket.createdAt ? ticket.createdAt.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown Date'}</span>
+                                    <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
+                                        <Calendar size={14} />
+                                        <span>{ticket.createdAt ? ticket.createdAt.toDate().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Unknown Date'}</span>
                                     </div>
                                 </div>
                             </div>
