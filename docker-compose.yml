@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: civictrust-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: civictrust
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: adminpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  ai-service:
+    build:
+      context: ./apps/ai-service
+      dockerfile: Dockerfile
+    container_name: civictrust-ai-service
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: civictrust-web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:adminpassword@db:5432/civictrust
+      - NEXTAUTH_SECRET=yoursupersecurenextauthsecretstring
+      - NEXTAUTH_URL=http://localhost:3000
+    depends_on:
+      - db
+      - ai-service
+
+volumes:
+  postgres_data:
