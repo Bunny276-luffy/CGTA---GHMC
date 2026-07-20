@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import ThreeDHolographicGlobe from "@/components/ThreeDHolographicGlobe";
+import ThreeDPhotoVerificationSimulator from "@/components/ThreeDPhotoVerificationSimulator";
+import ThreeDIsometricCity from "@/components/ThreeDIsometricCity";
+import ThreeDCyberRadar from "@/components/ThreeDCyberRadar";
 import ThreeDWorkflowCards from "@/components/ThreeDWorkflowCards";
 import CivicAnalyticsPanel from "@/components/CivicAnalyticsPanel";
 import CivicTracker from "@/components/CivicTracker";
@@ -121,6 +124,11 @@ export default function Home() {
         {/* Standalone 3D Holographic Globe */}
         <section className="py-24 border-t border-white/5 bg-transparent flex justify-center items-center">
           <ThreeDHolographicGlobe />
+        </section>
+
+        {/* 3D Interactive Photo Verification Pipeline Simulator */}
+        <section className="py-20 px-6 border-t border-white/5 bg-transparent flex justify-center items-center">
+          <ThreeDPhotoVerificationSimulator />
         </section>
 
         <AlternatingFeatures />

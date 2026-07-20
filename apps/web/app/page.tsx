@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import ThreeGlobe from "@/components/ThreeGlobe";
+import ThreeDPhotoVerificationSimulator from "@/components/ThreeDPhotoVerificationSimulator";
 import { 
   ShieldCheck, 
   MapPin, 
@@ -177,6 +178,11 @@ export default function Home() {
           </div>
 
         </div>
+      </section>
+
+      {/* Interactive 3D Photo Audit & Verification Pipeline Simulator */}
+      <section className="mx-auto max-w-7xl px-6 py-12">
+        <ThreeDPhotoVerificationSimulator />
       </section>
 
       {/* AI Pipeline Details */}
