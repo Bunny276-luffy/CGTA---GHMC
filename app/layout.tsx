@@ -27,8 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${plusJakarta.variable} ${inter.variable} antialiased min-h-screen bg-[#030308] text-slate-100 selection:bg-blue-500/20 selection:text-cyan-200 relative overflow-x-hidden`}>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body suppressHydrationWarning className={`${plusJakarta.variable} ${inter.variable} antialiased min-h-screen bg-[#030308] text-slate-100 selection:bg-blue-500/20 selection:text-cyan-200 relative overflow-x-hidden`}>
         {/* Global 3D Particle Space Background */}
         <ThreeDGlobalBackground />
         
