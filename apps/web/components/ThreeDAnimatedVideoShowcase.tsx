@@ -122,7 +122,7 @@ export default function ThreeDAnimatedVideoShowcase() {
 
       // Render Animated Video Background Grid & Particle Rays
       const bgGrad = ctx.createRadialGradient(cx, cy, 50, cx, cy, w * 0.6);
-      bgGrad.addColorStop(0, "#030712");
+      bgGrad.addColorStop(0, "#030308");
       bgGrad.addColorStop(0.5, "#0b1329");
       bgGrad.addColorStop(1, "#02040a");
       ctx.fillStyle = bgGrad;
@@ -231,7 +231,7 @@ export default function ThreeDAnimatedVideoShowcase() {
   };
 
   return (
-    <div className="relative w-full max-w-7xl mx-auto rounded-3xl border border-cyan-500/25 bg-[#030712]/95 backdrop-blur-2xl p-6 md:p-8 overflow-hidden shadow-2xl shadow-cyan-950/50">
+    <div className="relative w-full max-w-7xl mx-auto rounded-3xl border border-cyan-500/25 bg-[#030308]/95 backdrop-blur-2xl p-6 md:p-8 overflow-hidden shadow-2xl shadow-cyan-950/50">
       
       {/* Decorative Grid & Glow Ambient Background */}
       <div 

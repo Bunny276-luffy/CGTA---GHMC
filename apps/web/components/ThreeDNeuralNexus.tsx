@@ -322,7 +322,7 @@ export default function ThreeDNeuralNexus() {
   };
 
   return (
-    <div className="relative w-full max-w-7xl mx-auto rounded-3xl border border-cyan-500/20 bg-[#030712]/90 backdrop-blur-xl p-6 md:p-8 overflow-hidden shadow-2xl shadow-cyan-950/40">
+    <div className="relative w-full max-w-7xl mx-auto rounded-3xl border border-cyan-500/20 bg-[#030308]/90 backdrop-blur-xl p-6 md:p-8 overflow-hidden shadow-2xl shadow-cyan-950/40">
       
       {/* Decorative Grid Mesh Overlay */}
       <div 

@@ -32,7 +32,12 @@ export default function RootLayout({
                       str.indexOf('moz-extension://') !== -1 ||
                       str.indexOf('safari-extension://') !== -1 ||
                       str.indexOf('inpage.js') !== -1 ||
-                      str.indexOf('ExtendedBroadcastMessage') !== -1
+                      str.indexOf('contentscript.js') !== -1 ||
+                      str.indexOf('ExtendedBroadcastMessage') !== -1 ||
+                      str.indexOf('Channel secret not available') !== -1 ||
+                      str.indexOf('EthereumAdapter') !== -1 ||
+                      str.indexOf('SolanaAdapter') !== -1 ||
+                      str.indexOf('BinanceWeb3Provider') !== -1
                     );
                   } catch (err) {
                     return false;
@@ -55,7 +60,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body suppressHydrationWarning className="antialiased min-h-screen bg-[#030712] text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200">
+      <body suppressHydrationWarning className="antialiased min-h-screen bg-[#030308] text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200">
         {children}
       </body>
     </html>

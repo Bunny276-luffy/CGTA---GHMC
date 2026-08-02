@@ -14,7 +14,7 @@ export default function AlternatingFeatures() {
           <AnimatedText
             tag="h2"
             text="Engineered for Scale"
-            className="text-3xl md:text-5xl font-extrabold text-white tracking-tight leading-tight font-sans"
+            className="text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-indigo-200 to-purple-300 drop-shadow-[0_0_20px_rgba(56,189,248,0.4)] tracking-tight leading-tight font-sans"
           />
           <p className="text-sm text-slate-300 leading-relaxed font-sans">
             Discover the technical features built directly into our grievance redressal engine.
@@ -27,7 +27,7 @@ export default function AlternatingFeatures() {
             <div className="h-9 w-9 rounded-xl bg-cyan-500/5 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
               <Cpu className="h-4.5 w-4.5" />
             </div>
-            <h3 className="text-2xl md:text-3xl font-black text-white uppercase font-mono">
+            <h3 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-200 to-indigo-300 uppercase font-mono">
               AI-Powered Image Forensics
             </h3>
             <p className="text-xs text-slate-350 font-mono leading-relaxed">

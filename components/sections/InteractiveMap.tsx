@@ -186,7 +186,7 @@ export default function InteractiveMap() {
             </div>
 
             {/* Geological Satellite Image Map with Overlays */}
-            <div className="w-full h-full bg-[#020205] border border-white/10 rounded-3xl relative overflow-hidden min-h-[420px] aspect-[2/1] group flex items-center justify-center">
+            <div className="w-full h-full bg-[#030308] border border-white/10 rounded-3xl relative overflow-hidden min-h-[420px] aspect-[2/1] group flex items-center justify-center">
               <img 
                 src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Equirectangular_projection_SW.jpg/1024px-Equirectangular_projection_SW.jpg" 
                 alt="Geological Satellite World Map" 

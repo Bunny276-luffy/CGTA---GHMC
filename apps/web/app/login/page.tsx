@@ -71,7 +71,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-[#030712] px-6 py-12">
+    <div className="relative min-h-screen flex items-center justify-center bg-[#030308] px-6 py-12">
       {/* Background Orbs */}
       <div className="absolute top-[20%] left-[20%] h-[400px] w-[400px] rounded-full bg-cyan-500/5 blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[20%] right-[20%] h-[400px] w-[400px] rounded-full bg-purple-500/5 blur-[100px] pointer-events-none" />

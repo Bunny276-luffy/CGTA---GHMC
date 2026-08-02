@@ -121,13 +121,13 @@ export default function PublicStatsPage() {
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-[#030712] text-slate-100 flex flex-col">
+    <div className="relative min-h-screen bg-[#030308] text-slate-100 flex flex-col">
       {/* Background orbs */}
       <div className="absolute top-[10%] left-[5%] h-[500px] w-[500px] rounded-full bg-cyan-500/5 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[10%] right-[5%] h-[500px] w-[500px] rounded-full bg-purple-500/5 blur-[120px] pointer-events-none" />
 
       {/* Header bar */}
-      <header className="border-b border-white/5 bg-[#030712]/70 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-white/5 bg-[#030308]/70 backdrop-blur-md sticky top-0 z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-6">
             <Link 

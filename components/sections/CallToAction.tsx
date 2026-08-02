@@ -26,7 +26,7 @@ export default function CallToAction() {
               <AnimatedText
                 tag="h2"
                 text="Build Smarter Cities with CivicTrust"
-                className="text-3xl md:text-5xl font-black text-white uppercase font-mono leading-tight"
+                className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-indigo-200 to-purple-300 drop-shadow-[0_0_20px_rgba(56,189,248,0.4)] uppercase font-mono leading-tight"
               />
               <p className="text-xs text-slate-350 leading-relaxed font-mono">
                 Join thousands of citizens and municipal administrators securing public accountability on an automated ledger.

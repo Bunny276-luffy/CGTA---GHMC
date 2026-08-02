@@ -387,7 +387,7 @@ export default function ThreeDPhotoVerificationSimulator() {
   }, [currentStep, selectedSample]);
 
   return (
-    <div className="relative w-full max-w-7xl mx-auto rounded-3xl border border-cyan-500/20 bg-[#030712]/95 backdrop-blur-xl p-6 md:p-8 overflow-hidden shadow-2xl shadow-cyan-950/40">
+    <div className="relative w-full max-w-7xl mx-auto rounded-3xl border border-cyan-500/20 bg-[#030308]/95 backdrop-blur-xl p-6 md:p-8 overflow-hidden shadow-2xl shadow-cyan-950/40">
       
       {/* Background Neon Grid */}
       <div 

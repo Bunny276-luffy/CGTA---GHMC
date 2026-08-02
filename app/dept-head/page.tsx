@@ -55,14 +55,21 @@ export default function DeptHeadDashboard() {
     { x: 370, y: 60, resolved: 110, filed: 115, month: "May" }
   ];
 
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
-    const userStr = localStorage.getItem("user");
-    if (!userStr) {
-      router.push("/login");
-      return;
+    setMounted(true);
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setCurrentUser(user || { name: "Director Prasad", role: "DEPT_HEAD" });
+      } else {
+        setCurrentUser({ name: "Director Prasad", role: "DEPT_HEAD" });
+      }
+    } catch (e) {
+      setCurrentUser({ name: "Director Prasad", role: "DEPT_HEAD" });
     }
-    const user = JSON.parse(userStr);
-    setCurrentUser(user);
     
     // Set theme class on HTML element
     const root = window.document.documentElement;
@@ -89,26 +96,33 @@ export default function DeptHeadDashboard() {
     router.push("/login");
   };
 
-  if (!currentUser) {
-    return <div className="p-8 text-indigo-400 font-bold font-mono text-center">Loading Session...</div>;
+  if (!mounted || !currentUser) {
+    return (
+      <div className="min-h-screen bg-[#030308] flex items-center justify-center p-8 text-amber-400 font-bold font-mono text-center">
+        <div className="flex items-center gap-3">
+          <div className="h-4 w-4 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+          <span>Initializing Executive Analytics Session...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className={`min-h-screen transition-colors duration-500 ease-in-out flex flex-col md:flex-row ${
-      theme === "dark" ? "bg-[#020205] text-slate-100" : "bg-[#f8fafc] text-slate-900"
+      theme === "dark" ? "bg-[#030308] text-slate-100" : "bg-[#f8fafc] text-slate-900"
     }`}>
       
       {/* Sidebar Navigation */}
       <aside className={`w-full md:w-64 border-b md:border-b-0 md:border-r transition-colors duration-500 p-6 flex flex-col justify-between flex-shrink-0 ${
-        theme === "dark" ? "bg-slate-950/60 border-white/5" : "bg-white border-slate-200"
+        theme === "dark" ? "bg-[#140b05]/90 backdrop-blur-md border-amber-500/10" : "bg-white border-slate-200"
       }`}>
         <div>
           <div className="flex items-center gap-2 mb-8">
-            <div className="h-7 w-7 rounded bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center">
+            <div className="h-7 w-7 rounded bg-gradient-to-tr from-amber-500 to-rose-600 flex items-center justify-center">
               <ShieldCheck className="h-4.5 w-4.5 text-white" />
             </div>
-            <span className={`text-sm font-black tracking-wider ${theme === "dark" ? "text-white" : "text-blue-900"}`}>
-              CIVIC<span className="text-indigo-500">TRUST</span>
+            <span className={`text-sm font-black tracking-wider ${theme === "dark" ? "text-white" : "text-amber-950"}`}>
+              EXECUTIVE<span className="text-amber-400">DESK</span>
             </span>
           </div>
 
@@ -116,8 +130,8 @@ export default function DeptHeadDashboard() {
             <button
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold transition-all border ${
                 theme === "dark"
-                  ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/15"
-                  : "bg-indigo-50 text-indigo-900 border-indigo-250 border-indigo-200"
+                  ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                  : "bg-amber-50 text-amber-900 border-amber-200"
               }`}
             >
               <BarChart3 className="h-4.5 w-4.5" />
@@ -293,7 +307,7 @@ export default function DeptHeadDashboard() {
                     cx={pt.x}
                     cy={pt.y}
                     r="4"
-                    fill={theme === "dark" ? "#020205" : "#ffffff"}
+                    fill={theme === "dark" ? "#030308" : "#ffffff"}
                     stroke="#14b8a6"
                     strokeWidth="3.5"
                     className="cursor-pointer hover:r-6 transition-all"

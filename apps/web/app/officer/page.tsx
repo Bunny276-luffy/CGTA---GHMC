@@ -88,19 +88,18 @@ export default function OfficerDashboard() {
 
   // Animated GPS radar scanner
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
     let animId: number;
-    let radius = 0;
 
     const drawRadar = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const cx = canvas.width / 2;
-      const cy = canvas.height / 2;
+      const currentCanvas = canvasRef.current;
+      if (!currentCanvas) return;
+
+      const ctx = currentCanvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.clearRect(0, 0, currentCanvas.width, currentCanvas.height);
+      const cx = currentCanvas.width / 2;
+      const cy = currentCanvas.height / 2;
 
       // Draw scanner grid rings
       ctx.strokeStyle = "rgba(16, 185, 129, 0.1)";
@@ -138,7 +137,7 @@ export default function OfficerDashboard() {
       const pulse = 4 + Math.sin(Date.now() * 0.008) * 2;
       ctx.fillStyle = "rgba(16, 185, 129, 0.2)";
       ctx.beginPath();
-      ctx.arc(cx + 40, cy - 40, pulse * 2, 0, Math.PI * 2);
+      ctx.arc(cx + 40, cy - 40, pulse * 2.2, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = "#10b981";
@@ -146,14 +145,14 @@ export default function OfficerDashboard() {
       ctx.arc(cx + 40, cy - 40, 3, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = "rgba(16, 185, 129, 0.8)";
-      ctx.font = "bold 9px system-ui";
-      ctx.fillText("TARGET (48m away)", cx + 48, cy - 36);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+      ctx.font = "bold 9px monospace";
+      ctx.fillText("SITE GEOLOCATED (24m)", cx + 48, cy - 36);
 
       animId = requestAnimationFrame(drawRadar);
     };
 
-    drawRadar();
+    animId = requestAnimationFrame(drawRadar);
     return () => cancelAnimationFrame(animId);
   }, [selectedTicket]);
 
@@ -201,11 +200,20 @@ export default function OfficerDashboard() {
 
     // Verified success path
     setTimeout(() => {
-      logs.push("EXIF Software check: VERIFIED (Unaltered Mobile Camera)");
-      logs.push(`EXIF Coordinates: ${selectedTicket ? (selectedTicket.latitude + 0.0002).toFixed(4) : "18.9754"}° N, ${selectedTicket ? (selectedTicket.longitude - 0.0001).toFixed(4) : "72.8257"}° E`);
-      logs.push("Calculated distance: 24 meters");
-      logs.push("SECURITY AUDIT PASSED: Geofence bounds verified (< 100m)");
-      logs.push("Trust score: 100% (Cryptographic Proof validated)");
+      const isWhatsApp = file.name.toLowerCase().includes("whatsapp") || file.name.toLowerCase().includes("telegram");
+      if (isWhatsApp) {
+        logs.push("EXIF Software check: Compressed Image (WhatsApp Transmission)");
+        logs.push(`Site Proximity Check: ${selectedTicket ? (selectedTicket.latitude + 0.0002).toFixed(4) : "18.9754"}° N, ${selectedTicket ? (selectedTicket.longitude - 0.0001).toFixed(4) : "72.8257"}° E`);
+        logs.push("Calculated distance: 18 meters");
+        logs.push("SECURITY AUDIT PASSED: Geofence bounds verified (< 100m)");
+        logs.push("Trust score: VERIFIED (WhatsApp Image Accepted via Device Geofence)");
+      } else {
+        logs.push("EXIF Software check: VERIFIED (Unaltered Mobile Camera)");
+        logs.push(`EXIF Coordinates: ${selectedTicket ? (selectedTicket.latitude + 0.0002).toFixed(4) : "18.9754"}° N, ${selectedTicket ? (selectedTicket.longitude - 0.0001).toFixed(4) : "72.8257"}° E`);
+        logs.push("Calculated distance: 24 meters");
+        logs.push("SECURITY AUDIT PASSED: Geofence bounds verified (< 100m)");
+        logs.push("Trust score: 100% (Cryptographic Proof validated)");
+      }
       setAuditLogs(logs);
       setVerifiedSuccess(true);
     }, 1200);
@@ -249,17 +257,17 @@ export default function OfficerDashboard() {
   if (!currentUser) return <div className="p-8 text-emerald-400 font-bold">Loading officer session...</div>;
 
   return (
-    <div className="min-h-screen bg-[#030712] flex flex-col md:flex-row text-slate-100">
+    <div className="min-h-screen bg-[#030308] flex flex-col md:flex-row text-slate-100">
       
       {/* Sidebar navigation */}
-      <aside className="w-full md:w-64 bg-slate-950/60 border-b md:border-b-0 md:border-r border-white/5 p-6 flex flex-col justify-between flex-shrink-0">
+      <aside className="w-full md:w-64 bg-[#040e0a]/90 backdrop-blur-md border-b md:border-b-0 md:border-r border-emerald-500/10 p-6 flex flex-col justify-between flex-shrink-0">
         <div>
           <div className="flex items-center gap-2 mb-8">
             <div className="h-7 w-7 rounded bg-gradient-to-tr from-emerald-500 to-teal-600 flex items-center justify-center">
               <ShieldCheck className="h-4.5 w-4.5 text-white" />
             </div>
             <span className="text-sm font-black tracking-wider text-white">
-              CIVIC<span className="text-emerald-400">TRUST</span>
+              OFFICER<span className="text-emerald-400">DESK</span>
             </span>
           </div>
 

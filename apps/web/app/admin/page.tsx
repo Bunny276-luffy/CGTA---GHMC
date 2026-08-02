@@ -171,17 +171,17 @@ export default function AdminDashboard() {
   if (!currentUser) return <div className="p-8 text-purple-400 font-bold">Loading supervisor shell...</div>;
 
   return (
-    <div className="min-h-screen bg-[#030712] flex flex-col md:flex-row text-slate-100">
+    <div className="min-h-screen bg-[#030308] flex flex-col md:flex-row text-slate-100">
       
       {/* Sidebar navigation */}
-      <aside className="w-full md:w-64 bg-slate-950/60 border-b md:border-b-0 md:border-r border-white/5 p-6 flex flex-col justify-between flex-shrink-0">
+      <aside className="w-full md:w-64 bg-[#0d0718]/90 backdrop-blur-md border-b md:border-b-0 md:border-r border-purple-500/10 p-6 flex flex-col justify-between flex-shrink-0">
         <div>
           <div className="flex items-center gap-2 mb-8">
             <div className="h-7 w-7 rounded bg-gradient-to-tr from-purple-500 to-indigo-600 flex items-center justify-center">
               <ShieldCheck className="h-4.5 w-4.5 text-white" />
             </div>
             <span className="text-sm font-black tracking-wider text-white">
-              CIVIC<span className="text-purple-400">TRUST</span>
+              GOVERNANCE<span className="text-purple-400">ADMIN</span>
             </span>
           </div>
 

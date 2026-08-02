@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import ThreeGlobe from "@/components/ThreeGlobe";
+import RoleCardDeck from "@/components/RoleCardDeck";
 import { 
   ShieldCheck, 
   MapPin, 
@@ -51,13 +52,13 @@ export default function Home() {
   ];
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#030712]">
+    <div className="relative min-h-screen overflow-hidden bg-[#030308]">
       {/* Background Neon Mesh Gradients */}
       <div className="absolute top-[-10%] left-[-10%] h-[600px] w-[600px] rounded-full bg-cyan-500/10 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] h-[600px] w-[600px] rounded-full bg-purple-500/10 blur-[120px] pointer-events-none" />
       
       {/* Top Navigation */}
-      <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-[#030712]/70 backdrop-blur-md">
+      <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-[#030308]/70 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-tr from-cyan-500 to-purple-600">
@@ -216,6 +217,11 @@ export default function Home() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Interactive Role Consoles Card Deck */}
+      <section id="roles" className="mx-auto max-w-7xl px-6 py-12 border-t border-white/5">
+        <RoleCardDeck />
       </section>
 
       {/* Live Leaders / Ward Performance */}

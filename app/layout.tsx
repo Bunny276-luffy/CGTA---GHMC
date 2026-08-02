@@ -47,7 +47,12 @@ export default function RootLayout({
                       str.indexOf('moz-extension://') !== -1 ||
                       str.indexOf('safari-extension://') !== -1 ||
                       str.indexOf('inpage.js') !== -1 ||
-                      str.indexOf('ExtendedBroadcastMessage') !== -1
+                      str.indexOf('contentscript.js') !== -1 ||
+                      str.indexOf('ExtendedBroadcastMessage') !== -1 ||
+                      str.indexOf('Channel secret not available') !== -1 ||
+                      str.indexOf('EthereumAdapter') !== -1 ||
+                      str.indexOf('SolanaAdapter') !== -1 ||
+                      str.indexOf('BinanceWeb3Provider') !== -1
                     );
                   } catch (err) {
                     return false;
