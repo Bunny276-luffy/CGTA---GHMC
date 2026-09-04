@@ -29,7 +29,7 @@ export default function CallToAction() {
                 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-indigo-200 to-purple-300 drop-shadow-[0_0_20px_rgba(56,189,248,0.4)] uppercase font-mono leading-tight"
               />
               <p className="text-xs text-slate-350 leading-relaxed font-mono">
-                Join thousands of citizens and municipal administrators securing public accountability on an automated ledger.
+                Join citizens securing public accountability through AI-powered grievance validation and transparent municipal auditing.
               </p>
             </div>
 
@@ -38,13 +38,13 @@ export default function CallToAction() {
                 href="/register" 
                 className="px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-xl text-[10px] font-bold uppercase tracking-widest text-white shadow-lg shadow-blue-500/25 hover:scale-105 transition-all flex items-center gap-2"
               >
-                Join Platform <ArrowRight className="h-4 w-4" />
+                Report a Civic Issue <ArrowRight className="h-4 w-4" />
               </Link>
               <Link 
                 href="/login" 
                 className="px-8 py-4 bg-slate-900 border border-white/5 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-300 hover:bg-slate-800/60 hover:text-white transition-all"
               >
-                Sign In
+                Citizen Sign In
               </Link>
             </div>
 

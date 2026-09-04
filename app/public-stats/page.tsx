@@ -16,11 +16,12 @@ export default function PublicStatsPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const leaderboard: LeaderboardRow[] = [
-    { rank: "01", ward: "Ward 142 - Jubilee Hills, HYD", response: "11.2 Hrs", trust: "98.4%", resolved: 942 },
-    { rank: "02", ward: "Ward 88 - Bandra West, BOM", response: "14.5 Hrs", trust: "96.1%", resolved: 1208 },
-    { rank: "03", ward: "Ward 12 - Indiranagar, BLR", response: "16.1. Hrs", trust: "94.8%", resolved: 819 },
-    { rank: "04", ward: "Ward 55 - Adyar, CHN", response: "19.8 Hrs", trust: "91.2%", resolved: 630 },
-    { rank: "05", ward: "Ward 21 - Connaught Place, DEL", response: "22.4 Hrs", trust: "89.5%", resolved: 511 },
+    { rank: "01", ward: "Zone 1 - Khairatabad / Jubilee Hills", response: "11.2 Hrs", trust: "98.4%", resolved: 942 },
+    { rank: "02", ward: "Zone 2 - Serilingampally / HITEC City", response: "12.8 Hrs", trust: "96.5%", resolved: 1104 },
+    { rank: "03", ward: "Zone 3 - Secunderabad / Begumpet", response: "14.1 Hrs", trust: "95.2%", resolved: 819 },
+    { rank: "04", ward: "Zone 4 - Kukatpally / KPHB", response: "15.6 Hrs", trust: "93.8%", resolved: 730 },
+    { rank: "05", ward: "Zone 5 - Charminar / Old City", response: "17.4 Hrs", trust: "91.5%", resolved: 650 },
+    { rank: "06", ward: "Zone 6 - LB Nagar / Dilsukhnagar", response: "18.2 Hrs", trust: "90.1%", resolved: 590 },
   ];
 
   useEffect(() => {
@@ -31,7 +32,7 @@ export default function PublicStatsPage() {
     if (!ctx) return;
 
     let animId: number;
-    
+
     const nodes = [
       { x: 90, y: 120, size: 30, value: 0.8, name: "Sub-Zone A" },
       { x: 180, y: 70, size: 45, value: 0.95, name: "Sub-Zone B" },
@@ -74,7 +75,7 @@ export default function PublicStatsPage() {
         const radius = node.size * pulse;
 
         const grad = ctx.createRadialGradient(node.x, node.y, 2, node.x, node.y, radius);
-        
+
         if (node.value > 0.9) {
           grad.addColorStop(0, "rgba(244, 63, 94, 0.55)"); // Crimson
           grad.addColorStop(0.3, "rgba(244, 63, 94, 0.25)");
@@ -117,8 +118,8 @@ export default function PublicStatsPage() {
       <header className="border-b border-white/5 bg-[#030308]/75 backdrop-blur-md sticky top-0 z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-6">
-            <Link 
-              href="/login" 
+            <Link
+              href="/login"
               className="h-9 w-9 bg-slate-900 border border-white/5 hover:border-blue-500/20 text-slate-400 hover:text-white rounded-lg flex items-center justify-center transition-all shadow-sm"
             >
               <ArrowLeft className="h-4.5 w-4.5" />
@@ -139,9 +140,9 @@ export default function PublicStatsPage() {
       </header>
 
       <main className="flex-grow mx-auto max-w-7xl px-6 py-12 w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
+
         <div className="lg:col-span-7 space-y-8 text-left">
-          
+
           <div>
             <h2 className="text-2xl font-black text-white text-glow">Civic Transparency Metrics</h2>
             <p className="text-xs text-slate-500 mt-1">Real-time public performance tracking of municipal zones</p>
@@ -212,7 +213,7 @@ export default function PublicStatsPage() {
         </div>
 
         <div className="lg:col-span-5 space-y-6 text-left">
-          
+
           <div className="glass-panel p-6 rounded-2xl border-white/5 space-y-4">
             <div className="border-b border-white/5 pb-3">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">Predictive Infrastructure Heatmap</h3>

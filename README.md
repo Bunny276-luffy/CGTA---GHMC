@@ -1,5 +1,8 @@
 # CivicTrust (CGTA) — AI Grievance Verification & Trust Platform
 
+> [!IMPORTANT]
+> **Active Runtime Configuration**: The canonical application is the root Next.js application. The subdirectory `apps/web` is NOT part of the active runtime environment and is bypassed. Do not delete `apps/web` as it is preserved for reference.
+
 CivicTrust is a production-ready, AI-powered civic grievance verification and trust platform. It is designed for municipal corporations (like the Greater Hyderabad Municipal Corporation - GHMC or Brihanmumbai Municipal Corporation - BMC) to ingest citizen complaints (potholes, sewerage leaks, broken lights) while automatically auditing the authenticity of evidence using an independent verification pipeline before routing tasks to field officers.
 
 ---

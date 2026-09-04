@@ -1,63 +1,75 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { getRepository } from "@/lib/db";
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("userId")?.trim();
     const trackingId = searchParams.get("id")?.trim().toUpperCase();
+
+    if (userId) {
+      try {
+        const repo = getRepository();
+        const rawComplaints = await repo.getComplaintsByUserId(userId);
+        const complaints = rawComplaints.map(c => ({
+          id: c.id,
+          trackingId: c.tracking_id,
+          title: c.title,
+          description: c.description,
+          category: c.category,
+          status: c.status,
+          address: c.address,
+          severity: c.severity,
+          beforePhotoUrl: c.before_photo_url,
+          resolutionPhotoUrl: c.resolution_photo_url,
+          rejectionCount: c.rejection_count,
+          createdAt: c.created_at
+        }));
+        return NextResponse.json(complaints);
+      } catch (dbError: any) {
+        console.warn("Database offline or unreachable while querying user complaints:", dbError.message);
+        return NextResponse.json(
+          { message: "Service temporarily unavailable. Please try again." },
+          { status: 503 }
+        );
+      }
+    }
 
     if (!trackingId) {
       return NextResponse.json(
-        { message: "Tracking ID parameter is required" },
+        { message: "Tracking ID or User ID parameter is required" },
         { status: 400 }
       );
     }
 
-    // 1. Query the live PostgreSQL database
-    const res = await db.query(`
-      SELECT c.tracking_id, c.title, c.description, c.category, c.status, c.address, c.created_at,
-             r.trust_score, r.forgery_score, r.duplicate_detected, r.explainable_report
-      FROM complaints c
-      LEFT JOIN ai_reports r ON c.id = r.complaint_id
-      WHERE c.tracking_id = $1
-    `, [trackingId]);
-
-    if (res.rowCount && res.rowCount > 0) {
-      return NextResponse.json(res.rows[0]);
-    }
-
-    // 2. Fallback to active demonstration seed IDs if database is unseeded
-    const seeds: Record<string, any> = {
-      "CGTA-2026-0001": {
-        tracking_id: "CGTA-2026-0001",
-        title: "Jubilee Hills Pothole Repair",
-        description: "Large deep pothole at Road No. 36 near metro pillar 12.",
-        category: "Road Repair",
-        status: "CLOSED",
-        address: "Jubilee Hills Rd 36, Hyderabad",
-        created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-        trust_score: 98.4,
-        forgery_score: 0.0,
-        duplicate_detected: false,
-        explainable_report: "PASS: Coordinate proximity verified within 12m of reported location. Photo metadata verified as raw camera output."
-      },
-      "CGTA-2026-0002": {
-        tracking_id: "CGTA-2026-0002",
-        title: "Garbage Overflow at Madhapur",
-        description: "Open garbage dump piling up near tech park entry.",
-        category: "Waste Disposal",
-        status: "RESOLVED",
-        address: "Madhapur Main Rd, Hyderabad",
-        created_at: new Date(Date.now() - 86400000).toISOString(),
-        trust_score: 95.1,
-        forgery_score: 5.0,
-        duplicate_detected: false,
-        explainable_report: "PASS: Coordinate proximity verified within 24m of reported location. Warning: minor header discrepancy."
+    // Query the database for tracking ID
+    try {
+      const repo = getRepository();
+      const complaint = await repo.getComplaintByTrackingId(trackingId);
+      
+      if (complaint) {
+        const aiReport = await repo.getAIReportByComplaintId(complaint.id);
+        
+        return NextResponse.json({
+          tracking_id: complaint.tracking_id,
+          title: complaint.title,
+          description: complaint.description,
+          category: complaint.category,
+          status: complaint.status,
+          address: complaint.address,
+          created_at: complaint.created_at,
+          trust_score: aiReport?.trust_score,
+          forgery_score: aiReport?.forgery_score,
+          duplicate_detected: aiReport?.duplicate_detected,
+          explainable_report: aiReport?.explainable_report
+        });
       }
-    };
-
-    if (seeds[trackingId]) {
-      return NextResponse.json(seeds[trackingId]);
+    } catch (dbError: any) {
+      console.warn("Database offline while querying tracking ID:", dbError.message);
+      return NextResponse.json(
+        { message: "Service temporarily unavailable. Please try again." },
+        { status: 503 }
+      );
     }
 
     return NextResponse.json(
@@ -68,8 +80,8 @@ export async function GET(req: Request) {
   } catch (err: any) {
     console.error("TRACKING API ERROR:", err.message);
     return NextResponse.json(
-      { message: "Failed to fetch ledger details" },
-      { status: 500 }
+      { message: "Service temporarily unavailable. Please try again." },
+      { status: 503 }
     );
   }
 }

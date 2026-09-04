@@ -31,3 +31,12 @@ Thumbs.db
 # Docker volumes / databases
 pgdata/
 postgres_data/
+
+# SQLite databases
+*.db
+*.sqlite
+*.db-journal
+# AI Models and OCR data
+data/models/
+data/ocr/
+

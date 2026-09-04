@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { getRepository } from "@/lib/db";
 import { hashPassword } from "@/lib/crypto";
 
 export async function POST(req: Request) {
@@ -15,47 +15,45 @@ export async function POST(req: Request) {
 
     let user;
     try {
-      // Raw SQL: Check if user exists
-      const checkRes = await db.query(
-        "SELECT id, email FROM users WHERE email = $1",
-        [email]
-      );
+      const repo = getRepository();
 
-      if (checkRes.rowCount && checkRes.rowCount > 0) {
+      // Check if user exists
+      const existingUser = await repo.getUserByEmail(email);
+
+      if (existingUser) {
         return NextResponse.json(
           { message: "User with this email already exists" },
           { status: 409 }
         );
       }
 
-      // Raw SQL: Create new user
-      const insertRes = await db.query(
-        "INSERT INTO users (name, email, role, password_hash) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role",
-        [name, email, role, hashPassword(password)]
-      );
-
-      user = insertRes.rows[0];
+      // Create new user
+      user = await repo.createUser({
+        name,
+        email,
+        role,
+        password_hash: hashPassword(password)
+      });
       
       // Log Audit Event
-      await db.query(
-        "INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)",
-        [user.id, "REGISTER_USER", `User ${name} registered with role ${role}`]
-      );
+      await repo.createAuditLog({
+        user_id: user.id,
+        action: "REGISTER_USER",
+        details: `User ${name} registered with role ${role}`
+      });
 
     } catch (dbError: any) {
-      console.warn("PostgreSQL database not active, falling back to mock registration:", dbError.message);
-      
-      // Fallback user session for local demo/development
-      user = {
-        id: "mock-uid-" + Math.floor(Math.random() * 1000),
-        email,
-        name,
-        role: role.toUpperCase()
-      };
+      console.error("DATABASE REGISTER ERROR:", dbError.message);
+      return NextResponse.json(
+        { message: "Service temporarily unavailable. Please try again." },
+        { status: 503 }
+      );
     }
 
     // Generate Token
     const mockToken = `mock-jwt-token-header.${btoa(JSON.stringify(user))}.signature`;
+
+    const headers: Record<string, string> = {};
 
     return NextResponse.json(
       { 
@@ -63,7 +61,7 @@ export async function POST(req: Request) {
         user,
         token: mockToken
       },
-      { status: 201 }
+      { status: 201, headers }
     );
   } catch (error: any) {
     return NextResponse.json(

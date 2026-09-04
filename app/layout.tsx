@@ -1,8 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
 import ThreeDGlobalBackground from "@/components/ThreeDGlobalBackground";
 import CustomCursor from "@/components/CustomCursor";
+import MobileBottomBar from "@/components/MobileBottomBar";
+import PWARegister from "@/components/PWARegister";
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -16,9 +18,26 @@ const inter = Inter({
   variable: "--font-body",
 });
 
+export const viewport: Viewport = {
+  themeColor: "#6366f1",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export const metadata: Metadata = {
-  title: "CivicTrust (CGTA) | AI-Powered Grievance Platform",
-  description: "AI-powered grievance validation, anti-fraud geofencing, and trust calculation system.",
+  title: "CivicTrust (CGTA) | Official GHMC Municipal Grievance & Audit Platform",
+  description: "Official Greater Hyderabad Municipal Corporation AI-powered grievance validation, anti-fraud geofencing, and civic trust calculation platform.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "CivicTrust"
+  },
+  icons: {
+    icon: "/icon",
+    apple: "/icon"
+  }
 };
 
 export default function RootLayout({
@@ -75,7 +94,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body suppressHydrationWarning className={`${plusJakarta.variable} ${inter.variable} antialiased min-h-screen bg-[#030308] text-slate-100 selection:bg-blue-500/20 selection:text-cyan-200 relative overflow-x-hidden`}>
+      <body suppressHydrationWarning className={`${plusJakarta.variable} ${inter.variable} antialiased min-h-screen bg-[#030308] text-slate-100 selection:bg-blue-500/20 selection:text-cyan-200 relative overflow-x-hidden pb-16 md:pb-0`}>
+        {/* PWA Service Worker Registration */}
+        <PWARegister />
+
         {/* Global 3D Particle Space Background */}
         <ThreeDGlobalBackground />
         
@@ -86,6 +108,9 @@ export default function RootLayout({
         <div className="relative z-10 w-full min-h-screen flex flex-col bg-transparent">
           {children}
         </div>
+
+        {/* Universal Mobile Fixed Bottom Bar */}
+        <MobileBottomBar />
       </body>
     </html>
   );

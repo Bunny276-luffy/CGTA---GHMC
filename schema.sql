@@ -1,11 +1,23 @@
 -- CivicTrust Database Schema (PostgreSQL)
 
 -- Create custom enum types
-CREATE TYPE user_role AS ENUM ('CITIZEN', 'OFFICER', 'ADMIN');
-CREATE TYPE ticket_status AS ENUM ('SUBMITTED', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'TPA_REVIEW', 'CLOSED');
+DO $$ BEGIN
+    CREATE TYPE user_role AS ENUM ('CITIZEN', 'OFFICER', 'ADMIN', 'DEPT_HEAD');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE ticket_status AS ENUM ('SUBMITTED', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'TPA_REVIEW', 'CLOSED');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- Enable UUID extension if not already enabled
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- Users Table
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -16,7 +28,7 @@ CREATE TABLE users (
 );
 
 -- Complaints/Grievances Table
-CREATE TABLE complaints (
+CREATE TABLE IF NOT EXISTS complaints (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tracking_id VARCHAR(50) UNIQUE NOT NULL, -- Format: CGTA-YYYY-XXXX
     title VARCHAR(255) NOT NULL,
@@ -40,7 +52,7 @@ CREATE TABLE complaints (
 );
 
 -- Evidence Table (Attachments)
-CREATE TABLE evidence (
+CREATE TABLE IF NOT EXISTS evidence (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     complaint_id UUID NOT NULL REFERENCES complaints(id) ON DELETE CASCADE,
     file_url TEXT NOT NULL,
@@ -50,8 +62,8 @@ CREATE TABLE evidence (
     uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- AI Reports Table
-CREATE TABLE ai_reports (
+-- AI Reports Table (13-Stage Verification Output)
+CREATE TABLE IF NOT EXISTS ai_reports (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     complaint_id UUID UNIQUE NOT NULL REFERENCES complaints(id) ON DELETE CASCADE,
     exif_data JSONB,
@@ -61,11 +73,13 @@ CREATE TABLE ai_reports (
     trust_score DOUBLE PRECISION DEFAULT 100.0,
     explainable_report TEXT,
     priority_predicted VARCHAR(50) DEFAULT 'STANDARD',
+    image_sha256 VARCHAR(64),
+    image_phash VARCHAR(64),
     checked_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Notifications Table
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     message TEXT NOT NULL,
@@ -73,8 +87,8 @@ CREATE TABLE notifications (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Audit Logs Table
-CREATE TABLE audit_logs (
+-- Audit Logs Table (Immutable Public Audit Ledger)
+CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     action VARCHAR(255) NOT NULL,
@@ -83,10 +97,13 @@ CREATE TABLE audit_logs (
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indices for faster searches
-CREATE INDEX idx_complaints_tracking_id ON complaints(tracking_id);
-CREATE INDEX idx_complaints_status ON complaints(status);
-CREATE INDEX idx_complaints_category ON complaints(category);
-CREATE INDEX idx_evidence_complaint_id ON evidence(complaint_id);
-CREATE INDEX idx_notifications_user_id ON notifications(user_id);
-CREATE INDEX idx_audit_logs_timestamp ON audit_logs(timestamp);
+-- Indices for faster query lookups
+CREATE INDEX IF NOT EXISTS idx_complaints_tracking_id ON complaints(tracking_id);
+CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status);
+CREATE INDEX IF NOT EXISTS idx_complaints_category ON complaints(category);
+CREATE INDEX IF NOT EXISTS idx_complaints_created_by_id ON complaints(created_by_id);
+CREATE INDEX IF NOT EXISTS idx_evidence_complaint_id ON evidence(complaint_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
+CREATE INDEX IF NOT EXISTS idx_ai_reports_image_sha256 ON ai_reports(image_sha256);
+CREATE INDEX IF NOT EXISTS idx_ai_reports_image_phash ON ai_reports(image_phash);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { getRepository } from "@/lib/db";
 import { verifyPassword } from "@/lib/crypto";
 
 export async function POST(req: Request) {
@@ -15,20 +15,15 @@ export async function POST(req: Request) {
 
     let user;
     try {
-      // Raw SQL: Fetch user details
-      const userRes = await db.query(
-        "SELECT id, name, email, role, password_hash FROM users WHERE email = $1",
-        [email]
-      );
+      const repo = getRepository();
+      const dbUser = await repo.getUserByEmail(email);
 
-      if (!userRes.rowCount || userRes.rowCount === 0) {
+      if (!dbUser) {
         return NextResponse.json(
           { message: "Invalid email or password credentials" },
           { status: 401 }
         );
       }
-
-      const dbUser = userRes.rows[0];
 
       if (!verifyPassword(password, dbUser.password_hash)) {
         return NextResponse.json(
@@ -45,33 +40,30 @@ export async function POST(req: Request) {
       };
 
       // Log Audit Event
-      await db.query(
-        "INSERT INTO audit_logs (user_id, action, details) VALUES ($1, $2, $3)",
-        [user.id, "LOGIN_USER", `User ${user.name} logged in successfully`]
-      );
+      await repo.createAuditLog({
+        user_id: user.id,
+        action: "LOGIN_USER",
+        details: `User ${user.name} logged in successfully`
+      });
 
     } catch (dbError: any) {
-      console.warn("PostgreSQL database not active, falling back to mock authentication verification:", dbError.message);
-
-      // Auto-assign roles based on email keywords for easier testing
-      let role = "CITIZEN";
-      if (email.toLowerCase().includes("admin")) role = "ADMIN";
-      else if (email.toLowerCase().includes("officer")) role = "OFFICER";
-
-      user = {
-        id: "mock-uid-session",
-        email,
-        name: email.split("@")[0].toUpperCase(),
-        role: role
-      };
+      console.error("DATABASE LOGIN ERROR:", dbError.message);
+      return NextResponse.json(
+        { message: "Service temporarily unavailable. Please try again." },
+        { status: 503 }
+      );
     }
 
     const mockToken = `mock-jwt-token-header.${btoa(JSON.stringify(user))}.signature`;
+
+    const headers: Record<string, string> = {};
 
     return NextResponse.json({
       message: "Login successful",
       user,
       token: mockToken
+    }, {
+      headers
     });
   } catch (error: any) {
     return NextResponse.json(

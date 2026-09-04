@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { HeartHandshake, Building2, ShieldCheck, ArrowRight } from "lucide-react";
+import { CivicTrustAssets } from "../../data/images";
 
 interface ImpactItem {
   id: string;
@@ -21,18 +22,13 @@ export default function ServiceToSocietySection() {
   const [activeId, setActiveId] = useState<string | null>("infra");
   const [currentImageIdx, setCurrentImageIdx] = useState(0);
 
-  // 100% Verified High-Resolution Social Service Web Images
+  // Verified Local High-Resolution Municipal & Infrastructure Visual Assets
   const realWorldSocialServiceImages = [
-    "https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&q=80&w=1920", // Food drive & community aid
-    "https://images.unsplash.com/photo-1578357078586-491adf1aa5ba?auto=format&fit=crop&q=80&w=1920", // Urban sanitation & field work
-    "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&q=80&w=1920", // Community environmental planting
-    "https://images.unsplash.com/photo-1531206715517-5c0ba140b2b8?auto=format&fit=crop&q=80&w=1920", // Civic community & municipal meeting
-    "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&q=80&w=1920", // Charity & social welfare distribution
-    "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?auto=format&fit=crop&q=80&w=1920", // Public volunteers & teamwork
-    "https://images.unsplash.com/photo-1509099836639-18ba1795216d?auto=format&fit=crop&q=80&w=1920", // Disaster relief & humanitarian support
-    "https://images.unsplash.com/photo-1469571486292-0ba58a3f068b?auto=format&fit=crop&q=80&w=1920", // Public parks & community improvement
-    "/pothole_ai_verification.png", // Pothole & Road Defect AI Scanning
-    "/municipal_control_room.png"   // Municipal Control Room
+    CivicTrustAssets.pothole,
+    CivicTrustAssets.controlRoom,
+    CivicTrustAssets.citizenReporting,
+    CivicTrustAssets.dashboard,
+    CivicTrustAssets.ledger
   ];
 
   // Auto-switch background image slideshow every 2 seconds
@@ -97,7 +93,7 @@ export default function ServiceToSocietySection() {
 
   return (
     <section className="py-28 border-y border-white/10 bg-black relative z-10 overflow-hidden my-12 shadow-2xl min-h-[580px]">
-      
+
       {/* High Visibility Background Image Slideshow */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <AnimatePresence mode="wait">
@@ -119,7 +115,7 @@ export default function ServiceToSocietySection() {
 
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-6 relative z-10 space-y-14">
-        
+
         {/* BIG Title (Fully Visible, No Descender Clipping) */}
         <div className="text-center space-y-4 max-w-full mx-auto px-4 py-2 overflow-visible">
           <h2 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight font-sans text-center leading-normal pb-3 block w-full whitespace-nowrap text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-purple-200 to-emerald-300 drop-shadow-[0_0_25px_rgba(56,189,248,0.5)] overflow-visible">
@@ -129,7 +125,7 @@ export default function ServiceToSocietySection() {
 
         {/* Vertical Sphere Column (Left) + Detail Box beside it (Right - Auto-Closes in 5 Seconds!) */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center max-w-5xl mx-auto min-h-[240px]">
-          
+
           {/* Left: Vertical Sphere Buttons Column */}
           <div className="md:col-span-5 flex md:flex-col justify-center items-start gap-6">
             {items.map((item) => {
@@ -164,7 +160,7 @@ export default function ServiceToSocietySection() {
           </div>
 
           {/* Right: Expandable Detail Text Box (Auto-Disappears after 5 Seconds!) */}
-          <div 
+          <div
             className="md:col-span-7 h-full flex items-center"
             onMouseLeave={() => setActiveId(null)}
           >

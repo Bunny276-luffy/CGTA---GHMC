@@ -63,7 +63,7 @@ export default function CivicTracker() {
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-8">
-      
+
       {/* Search Input Card */}
       <TiltCard>
         <div className="glass-panel p-6 rounded-3xl border border-amber-500/10 bg-slate-950/45 text-left space-y-4">
@@ -72,7 +72,7 @@ export default function CivicTracker() {
               Verify On-Chain Grievance Ledger
             </h3>
             <p className="text-[10px] text-slate-400 font-mono">
-              Enter any grievance tracking ID (e.g. <span className="text-amber-400">CGTA-2026-0001</span> or <span className="text-amber-400">CGTA-2026-0002</span>) to run a live telemetry integrity audit.
+              Enter your official grievance tracking ID (e.g. <span className="text-amber-400">CGTA-YYYY-XXXX</span>) to run a live telemetry integrity audit.
             </p>
           </div>
 
@@ -87,7 +87,7 @@ export default function CivicTracker() {
               />
               <Search className="absolute right-4 top-3.5 h-4 w-4 text-slate-500 pointer-events-none" />
             </div>
-            
+
             <button
               type="submit"
               disabled={isLoading}
@@ -113,12 +113,12 @@ export default function CivicTracker() {
       {/* Audit Result Display */}
       {result && (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-stretch animate-fade-in-up">
-          
+
           {/* Left Column: Complaint Details & Verification Progress */}
           <div className="md:col-span-7">
             <TiltCard className="h-full">
               <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-slate-950/60 h-full flex flex-col justify-between space-y-6 text-left">
-                
+
                 <div className="space-y-4">
                   <div className="flex justify-between items-center border-b border-white/5 pb-3">
                     <div>
@@ -154,11 +154,11 @@ export default function CivicTracker() {
                   <span className="text-[8px] font-mono text-slate-500 uppercase tracking-wider block">
                     Grievance Audit Lifecycle:
                   </span>
-                  
+
                   <div className="flex items-center justify-between w-full relative">
                     <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-slate-800 -translate-y-1/2 z-0" />
-                    <div 
-                      className="absolute top-1/2 left-0 h-[2px] bg-amber-500 -translate-y-1/2 z-0 transition-all duration-500" 
+                    <div
+                      className="absolute top-1/2 left-0 h-[2px] bg-amber-500 -translate-y-1/2 z-0 transition-all duration-500"
                       style={{ width: `${(currentStep - 1) * 25}%` }}
                     />
 
@@ -170,10 +170,10 @@ export default function CivicTracker() {
                       { step: 5, label: "Sealed" }
                     ].map((s) => (
                       <div key={s.step} className="flex flex-col items-center relative z-10">
-                        <div 
+                        <div
                           className={`h-6 w-6 rounded-full flex items-center justify-center border font-mono text-[9px] font-bold ${
-                            currentStep >= s.step 
-                              ? "bg-amber-500 border-amber-400 text-slate-950 shadow-md shadow-amber-500/20" 
+                            currentStep >= s.step
+                              ? "bg-amber-500 border-amber-400 text-slate-950 shadow-md shadow-amber-500/20"
                               : "bg-slate-950 border-slate-850 text-slate-500"
                           }`}
                         >
@@ -195,7 +195,7 @@ export default function CivicTracker() {
           <div className="md:col-span-5">
             <TiltCard className="h-full">
               <div className="glass-panel p-6 rounded-3xl border border-white/5 bg-slate-950/20 h-full flex flex-col justify-between space-y-6 text-left">
-                
+
                 <div className="space-y-4">
                   <div className="flex justify-between items-center border-b border-white/5 pb-3">
                     <span className="text-[9px] font-mono text-indigo-400 font-bold uppercase tracking-wider">

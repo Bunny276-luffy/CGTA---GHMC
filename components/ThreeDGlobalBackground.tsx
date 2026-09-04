@@ -42,17 +42,20 @@ export default function ThreeDGlobalBackground() {
     mouseRef.current.x = window.innerWidth / 2;
     mouseRef.current.y = window.innerHeight / 2;
 
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const isMobile = window.innerWidth < 768;
+
     // Drifting ambient color spotlights matching Royal Blue / Cyan theme
     const auroras = [
-      { x: 0.15, y: 0.2, targetX: 0.15, targetY: 0.2, r: 600, color: "rgba(30, 58, 138, 0.12)", speed: 0.0004 },  // Deep Blue
-      { x: 0.85, y: 0.25, targetX: 0.85, targetY: 0.25, r: 650, color: "rgba(6, 182, 212, 0.08)", speed: 0.0003 }, // Cyan
-      { x: 0.5, y: 0.75, targetX: 0.5, targetY: 0.75, r: 700, color: "rgba(99, 102, 241, 0.07)", speed: 0.0002 }   // Indigo
+      { x: 0.15, y: 0.2, targetX: 0.15, targetY: 0.2, r: isMobile ? 350 : 600, color: "rgba(30, 58, 138, 0.12)", speed: 0.0004 },  // Deep Blue
+      { x: 0.85, y: 0.25, targetX: 0.85, targetY: 0.25, r: isMobile ? 380 : 650, color: "rgba(6, 182, 212, 0.08)", speed: 0.0003 }, // Cyan
+      { x: 0.5, y: 0.75, targetX: 0.5, targetY: 0.75, r: isMobile ? 400 : 700, color: "rgba(99, 102, 241, 0.07)", speed: 0.0002 }   // Indigo
     ];
 
     // Initialize 3D Constellation Sphere Nodes (Digital Network Topology)
     const constellationNodes: NetworkNode[] = [];
-    const sphereRadius = 380;
-    const nodeCount = 55;
+    const sphereRadius = isMobile ? 220 : 380;
+    const nodeCount = isMobile ? 25 : 55;
 
     for (let i = 0; i < nodeCount; i++) {
       const theta = Math.random() * Math.PI * 2;
@@ -73,7 +76,8 @@ export default function ThreeDGlobalBackground() {
 
     // Drifting background stars
     const backgroundStars: { x: number; y: number; z: number; size: number }[] = [];
-    for (let i = 0; i < 35; i++) {
+    const starCount = isMobile ? 15 : 35;
+    for (let i = 0; i < starCount; i++) {
       backgroundStars.push({
         x: (Math.random() - 0.5) * window.innerWidth * 1.5,
         y: (Math.random() - 0.5) * window.innerHeight * 1.5,
@@ -229,13 +233,15 @@ export default function ThreeDGlobalBackground() {
       ctx.fillStyle = textHighlight;
       ctx.fillRect(0, 0, w, h);
 
-      animId = requestAnimationFrame(render);
+      if (!prefersReducedMotion) {
+        animId = requestAnimationFrame(render);
+      }
     };
 
     render();
 
     return () => {
-      cancelAnimationFrame(animId);
+      if (animId) cancelAnimationFrame(animId);
       window.removeEventListener("resize", resize);
       window.removeEventListener("mousemove", handleMouseMove);
     };

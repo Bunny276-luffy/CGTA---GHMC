@@ -1,49 +1,30 @@
-import { Pool, QueryResult } from "pg";
+import { DatabaseRepository } from './repositories/types';
+import { SQLiteRepository } from './repositories/sqlite';
+import { PostgresRepository } from './repositories/postgres';
 
-const connectionString = process.env.DATABASE_URL || "postgresql://postgres:adminpassword@localhost:5432/civictrust";
+let repositoryInstance: DatabaseRepository | null = null;
 
-const pool = new Pool({
-  connectionString,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
-  max: 20, // Max clients in pool
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+export function getRepository(): DatabaseRepository {
+  if (repositoryInstance) return repositoryInstance;
 
+  const provider = process.env.DATABASE_PROVIDER || 'sqlite';
+  
+  if (provider === 'postgres') {
+    repositoryInstance = new PostgresRepository();
+  } else {
+    repositoryInstance = new SQLiteRepository();
+  }
+
+  return repositoryInstance;
+}
+
+// Keeping a mocked db.query and db.transaction for backward compatibility in scripts
+// if necessary, but ideally everything should use getRepository().
 export const db = {
-  /**
-   * Run a standard SQL query with parameters.
-   */
-  async query<T = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
-    const start = Date.now();
-    try {
-      const res = await pool.query<T>(text, params);
-      const duration = Date.now() - start;
-      if (process.env.NODE_ENV !== "production") {
-        console.log("SQL QUERY EXEC:", { text, duration: `${duration}ms`, rows: res.rowCount });
-      }
-      return res;
-    } catch (err: any) {
-      console.error("SQL QUERY ERROR:", { text, error: err.message });
-      throw err;
-    }
+  async query(text: string, params?: any[]): Promise<any> {
+    throw new Error('db.query is deprecated. Use getRepository() instead.');
   },
-
-  /**
-   * Helper to perform database transactions.
-   */
-  async transaction<T>(callback: (client: any) => Promise<T>): Promise<T> {
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      const result = await callback(client);
-      await client.query("COMMIT");
-      return result;
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
+  async transaction(callback: any): Promise<any> {
+    throw new Error('db.transaction is deprecated. Use getRepository() instead.');
   }
 };
