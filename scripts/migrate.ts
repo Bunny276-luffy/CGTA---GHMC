@@ -1,3 +1,6 @@
+import { loadEnvConfig } from "@next/env";
+loadEnvConfig(process.cwd());
+
 import { getRepository } from "../lib/db";
 import fs from "fs";
 import path from "path";
