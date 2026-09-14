@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ShieldCheck, Mail, Lock, User, ArrowRight, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import ThreeDAuthBackground from "@/components/ThreeDAuthBackground";
+import ThreeDAuthBackground from "./ThreeDAuthBackground";
 
 /**
  * Shared Role-Specific Authentication Component

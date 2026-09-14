@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
-import ThreeDGlobalBackground from "@/components/ThreeDGlobalBackground";
-import CustomCursor from "@/components/CustomCursor";
-import MobileBottomBar from "@/components/MobileBottomBar";
-import PWARegister from "@/components/PWARegister";
+import ThreeDGlobalBackground from "../components/ThreeDGlobalBackground";
+import CustomCursor from "../components/CustomCursor";
+import MobileBottomBar from "../components/MobileBottomBar";
+import PWARegister from "../components/PWARegister";
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],

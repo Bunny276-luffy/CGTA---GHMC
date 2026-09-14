@@ -10,12 +10,12 @@ import {
 import Link from "next/link";
 
 // Import Modular Sections
-import HeroSection from "@/components/sections/Hero";
-import MetricsSection from "@/components/sections/Metrics";
-import AlternatingFeatures from "@/components/sections/AlternatingFeatures";
-import FAQSection from "@/components/sections/FAQ";
-import CallToAction from "@/components/sections/CallToAction";
-import Footer from "@/components/sections/Footer";
+import HeroSection from "../components/sections/Hero";
+import MetricsSection from "../components/sections/Metrics";
+import AlternatingFeatures from "../components/sections/AlternatingFeatures";
+import FAQSection from "../components/sections/FAQ";
+import CallToAction from "../components/sections/CallToAction";
+import Footer from "../components/sections/Footer";
 
 // Custom Text Scramble for Kinetic Hover Feedback
 function useTextScramble(originalText: string) {
