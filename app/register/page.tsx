@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import { RoleAuthPage } from "@/components/RoleAuthPage";
+import { RoleAuthPage } from "../../components/RoleAuthPage";
 
 /**
  * /register — Citizen Registration

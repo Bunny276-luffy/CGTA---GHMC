@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import MobileNavDrawer from "@/components/MobileNavDrawer";
+import MobileNavDrawer from "../components/MobileNavDrawer";
 import {
   ShieldCheck,
   Menu,
