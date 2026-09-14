@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { VerificationResult } from "@/lib/verification-engine";
+import type { VerificationResult } from "../../lib/verification-engine";
 import {
   ShieldCheck,
   PlusCircle,

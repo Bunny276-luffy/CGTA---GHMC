@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getRepository } from "@/lib/db";
-import { runVerificationPipeline, getCachedVerificationResult } from "@/lib/verification-engine";
+import { getRepository } from "../../../../lib/db";
+import { runVerificationPipeline, getCachedVerificationResult } from "../../../../lib/verification-engine";
 
 export async function POST(req: Request) {
   try {

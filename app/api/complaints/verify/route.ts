@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runVerificationPipeline, cacheVerificationResult } from "@/lib/verification-engine";
+import { runVerificationPipeline, cacheVerificationResult } from "../../../../lib/verification-engine";
 
 export async function POST(req: Request) {
   try {

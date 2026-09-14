@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getRepository } from "@/lib/db";
-import { verifyPassword } from "@/lib/crypto";
+import { getRepository } from "../../../../lib/db";
+import { verifyPassword } from "../../../../lib/crypto";
 
 export async function POST(req: Request) {
   try {
