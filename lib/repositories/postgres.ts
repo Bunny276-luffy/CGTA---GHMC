@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { Pool, PoolConfig } from "pg";
 import {
   User,
@@ -5,6 +6,9 @@ import {
   Evidence,
   AIReport,
   AuditLog,
+  AppNotification,
+  CategoryStat,
+  VerificationStats,
   DashboardStats,
   DatabaseRepository
 } from './types';
@@ -29,7 +33,7 @@ function getPoolConfig(): PoolConfig {
   }
 
   return {
-    connectionString: connectionString || (isProduction ? undefined : "postgresql://postgres:adminpassword@localhost:5432/civictrust"),
+    connectionString: connectionString || undefined,
     ssl,
     max: process.env.DB_POOL_MAX ? parseInt(process.env.DB_POOL_MAX, 10) : 20,
     idleTimeoutMillis: 30000,
@@ -85,52 +89,65 @@ export class PostgresRepository implements DatabaseRepository {
     const pool = getPool();
     const client = await pool.connect();
     try {
-      await client.query("BEGIN");
-      
-      const tracking_id = `CGTA-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+      // Tracking IDs are random per the CGTA-YYYY-XXXXXX format. With a UNIQUE
+      // constraint, random collisions become likely as the ledger grows —
+      // retry with a fresh ID instead of failing the citizen's submission.
+      let lastError: unknown = null;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        try {
+          await client.query("BEGIN");
 
-      const compRes = await client.query(
-        `INSERT INTO complaints 
-          (tracking_id, title, description, category, latitude, longitude, address, severity, anonymous, before_photo_url, created_by_id) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
-         RETURNING *`,
-        [
-          tracking_id,
-          complaint.title,
-          complaint.description,
-          complaint.category,
-          complaint.latitude,
-          complaint.longitude,
-          complaint.address,
-          complaint.severity,
-          complaint.anonymous || false,
-          complaint.before_photo_url || null,
-          complaint.created_by_id
-        ]
-      );
-      
-      const newComplaint = compRes.rows[0] as Complaint;
+          const tracking_id = `CGTA-${new Date().getFullYear()}-${randomBytes(3).toString('hex').toUpperCase().slice(0, 6)}`;
 
-      if (evidence) {
-        await client.query(
-          `INSERT INTO evidence 
-            (complaint_id, file_url, file_type, size_bytes, metadata)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [
-            newComplaint.id,
-            evidence.file_url,
-            evidence.file_type,
-            evidence.size_bytes,
-            evidence.metadata ? JSON.stringify(evidence.metadata) : null
-          ]
-        );
+          const compRes = await client.query(
+            `INSERT INTO complaints
+              (tracking_id, title, description, category, latitude, longitude, address, severity, anonymous, before_photo_url, created_by_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             RETURNING *`,
+            [
+              tracking_id,
+              complaint.title,
+              complaint.description,
+              complaint.category,
+              complaint.latitude,
+              complaint.longitude,
+              complaint.address,
+              complaint.severity,
+              complaint.anonymous || false,
+              complaint.before_photo_url || null,
+              complaint.created_by_id
+            ]
+          );
+
+          const newComplaint = compRes.rows[0] as Complaint;
+
+          if (evidence) {
+            await client.query(
+              `INSERT INTO evidence
+                (complaint_id, file_url, file_type, size_bytes, metadata)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [
+                newComplaint.id,
+                evidence.file_url,
+                evidence.file_type,
+                evidence.size_bytes,
+                evidence.metadata ? JSON.stringify(evidence.metadata) : null
+              ]
+            );
+          }
+
+          await client.query("COMMIT");
+          return newComplaint;
+        } catch (err: any) {
+          await client.query("ROLLBACK").catch(() => {});
+          lastError = err;
+          // Retry only on a tracking-ID uniqueness collision; rethrow anything else.
+          if (!String(err.message).includes('tracking_id')) throw err;
+        }
       }
-
-      await client.query("COMMIT");
-      return newComplaint;
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
+      throw lastError instanceof Error
+        ? lastError
+        : new Error('Could not allocate a unique tracking ID after repeated attempts');
     } finally {
       client.release();
     }
@@ -139,6 +156,12 @@ export class PostgresRepository implements DatabaseRepository {
   async getComplaintByTrackingId(trackingId: string): Promise<Complaint | null> {
     const pool = getPool();
     const res = await pool.query('SELECT * FROM complaints WHERE tracking_id = $1', [trackingId]);
+    return res.rows.length > 0 ? (res.rows[0] as Complaint) : null;
+  }
+
+  async getComplaintById(complaintId: string): Promise<Complaint | null> {
+    const pool = getPool();
+    const res = await pool.query('SELECT * FROM complaints WHERE id = $1', [complaintId]);
     return res.rows.length > 0 ? (res.rows[0] as Complaint) : null;
   }
 
@@ -160,13 +183,60 @@ export class PostgresRepository implements DatabaseRepository {
     return res.rows as Complaint[];
   }
 
-  async updateComplaintStatus(complaintId: string, status: string, assignedOfficerId?: string): Promise<void> {
-    const pool = getPool();
-    if (assignedOfficerId) {
-      await pool.query('UPDATE complaints SET status = $1, assigned_officer_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3', [status, assignedOfficerId, complaintId]);
-    } else {
-      await pool.query('UPDATE complaints SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2', [status, complaintId]);
+  async updateComplaintStatus(
+    complaintId: string,
+    status: string,
+    options?: {
+      assignedOfficerId?: string | null;
+      resolutionPhotoUrl?: string;
+      rejectionCount?: number;
+      citizenConfirmed?: boolean;
     }
+  ): Promise<void> {
+    const pool = getPool();
+    const sets: string[] = ['status = $1', 'updated_at = CURRENT_TIMESTAMP'];
+    const params: any[] = [status];
+    let idx = 2;
+
+    if (options?.assignedOfficerId !== undefined) {
+      sets.push(`assigned_officer_id = $${idx++}`);
+      params.push(options.assignedOfficerId);
+    }
+    if (options?.resolutionPhotoUrl !== undefined) {
+      sets.push(`resolution_photo_url = $${idx++}`);
+      params.push(options.resolutionPhotoUrl);
+    }
+    if (options?.rejectionCount !== undefined) {
+      sets.push(`rejection_count = $${idx++}`);
+      params.push(options.rejectionCount);
+    }
+    if (options?.citizenConfirmed !== undefined) {
+      sets.push(`citizen_confirmed = $${idx++}`);
+      params.push(options.citizenConfirmed);
+    }
+
+    params.push(complaintId);
+    await pool.query(
+      `UPDATE complaints SET ${sets.join(', ')} WHERE id = $${idx}`,
+      params
+    );
+  }
+
+  async listUsers(limit = 200): Promise<User[]> {
+    const pool = getPool();
+    const res = await pool.query(
+      'SELECT id, email, name, role, created_at, updated_at FROM users ORDER BY created_at DESC LIMIT $1',
+      [limit]
+    );
+    return res.rows as User[];
+  }
+
+  async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
+    const pool = getPool();
+    await pool.query(
+      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [passwordHash, userId]
+    );
   }
 
   async createAIReport(report: Omit<AIReport, 'id' | 'checked_at'>): Promise<AIReport> {
@@ -198,6 +268,18 @@ export class PostgresRepository implements DatabaseRepository {
     return res.rows.length > 0 ? (res.rows[0] as AIReport) : null;
   }
 
+  async createComplaintEvidence(
+    complaintId: string,
+    evidence: { file_url: string; file_type: string; size_bytes: number; metadata?: string }
+  ): Promise<void> {
+    const pool = getPool();
+    await pool.query(
+      `INSERT INTO evidence (complaint_id, file_url, file_type, size_bytes, metadata)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [complaintId, evidence.file_url, evidence.file_type, evidence.size_bytes, evidence.metadata || null]
+    );
+  }
+
   async getEvidenceByComplaintId(complaintId: string): Promise<Evidence | null> {
     const pool = getPool();
     const res = await pool.query('SELECT * FROM evidence WHERE complaint_id = $1 LIMIT 1', [complaintId]);
@@ -212,10 +294,110 @@ export class PostgresRepository implements DatabaseRepository {
     );
   }
 
+  async getAuditLogs(limit = 100): Promise<AuditLog[]> {
+    const pool = getPool();
+    const res = await pool.query(
+      'SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT $1',
+      [limit]
+    );
+    return res.rows as AuditLog[];
+  }
+
+  async createSystemError(error: Omit<import('./types').SystemErrorLog, 'id' | 'timestamp'>): Promise<void> {
+    try {
+      const pool = getPool();
+      await pool.query(
+        'INSERT INTO system_errors (area, endpoint, severity, status, message, details) VALUES ($1, $2, $3, $4, $5, $6)',
+        [
+          error.area,
+          error.endpoint || null,
+          error.severity || 'ERROR',
+          error.status || 'UNRESOLVED',
+          error.message,
+          error.details || null
+        ]
+      );
+    } catch {
+      // Ignore error if schema not initialized yet
+    }
+  }
+
+  async getSystemErrors(limit = 100): Promise<import('./types').SystemErrorLog[]> {
+    try {
+      const pool = getPool();
+      const res = await pool.query('SELECT * FROM system_errors ORDER BY timestamp DESC LIMIT $1', [limit]);
+      return res.rows as import('./types').SystemErrorLog[];
+    } catch {
+      return [];
+    }
+  }
+
+  async checkHealth(): Promise<{ ok: boolean; latencyMs: number; provider: string; error?: string }> {
+    const start = Date.now();
+    try {
+      const pool = getPool();
+      await pool.query('SELECT 1');
+      return { ok: true, latencyMs: Date.now() - start, provider: 'postgres' };
+    } catch (err: any) {
+      return { ok: false, latencyMs: Date.now() - start, provider: 'postgres', error: err?.message || String(err) };
+    }
+  }
+
+
+  async createNotification(userId: string, message: string): Promise<void> {
+    const pool = getPool();
+    await pool.query(
+      'INSERT INTO notifications (user_id, message) VALUES ($1, $2)',
+      [userId, message]
+    );
+    // Prune: keep only the latest 50 per user so the table cannot grow unbounded.
+    await pool.query(
+      'DELETE FROM notifications WHERE user_id = $1 AND id NOT IN (SELECT id FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50)',
+      [userId]
+    );
+  }
+
+  async getNotificationsByUserId(userId: string, limit = 30): Promise<AppNotification[]> {
+    const pool = getPool();
+    const res = await pool.query(
+      'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2',
+      [userId, limit]
+    );
+    return res.rows as AppNotification[];
+  }
+
+  async markNotificationsRead(userId: string): Promise<void> {
+    const pool = getPool();
+    await pool.query('UPDATE notifications SET read = TRUE WHERE user_id = $1', [userId]);
+  }
+
+  async getCategoryStats(): Promise<CategoryStat[]> {
+    const pool = getPool();
+    const res = await pool.query(
+      'SELECT category, COUNT(*)::int as count FROM complaints GROUP BY category ORDER BY count DESC'
+    );
+    return res.rows as CategoryStat[];
+  }
+
+  async getVerificationStats(): Promise<VerificationStats> {
+    const pool = getPool();
+    const res = await pool.query(`
+      SELECT
+        COUNT(*)::int as "totalReports",
+        COALESCE(ROUND(AVG(trust_score)::numeric, 1), 0)::float8 as "avgTrustScore",
+        COALESCE(SUM(CASE WHEN trust_score >= 70 THEN 1 ELSE 0 END), 0)::int as "highTrust",
+        COALESCE(SUM(CASE WHEN trust_score < 70 THEN 1 ELSE 0 END), 0)::int as "lowTrust",
+        COALESCE(SUM(CASE WHEN duplicate_detected THEN 1 ELSE 0 END), 0)::int as "duplicatesFlagged",
+        COALESCE(SUM(CASE WHEN forgery_score >= 50 THEN 1 ELSE 0 END), 0)::int as "manipulationFlagged"
+      FROM ai_reports
+    `);
+    return res.rows[0] as VerificationStats;
+  }
+
   async getDashboardStats(): Promise<DashboardStats> {
     const pool = getPool();
     const totalRes = await pool.query('SELECT COUNT(*) FROM complaints');
-    const resolvedRes = await pool.query("SELECT COUNT(*) FROM complaints WHERE status = 'RESOLVED'");
+    const resolvedRes = await pool.query("SELECT COUNT(*) FROM complaints WHERE status IN ('RESOLVED', 'CLOSED')");
     const inProgressRes = await pool.query("SELECT COUNT(*) FROM complaints WHERE status = 'IN_PROGRESS'");
     const submittedRes = await pool.query("SELECT COUNT(*) FROM complaints WHERE status = 'SUBMITTED'");
     const assignedRes = await pool.query("SELECT COUNT(*) FROM complaints WHERE status = 'ASSIGNED'");

@@ -40,3 +40,11 @@ postgres_data/
 data/models/
 data/ocr/
 
+
+# SQLite WAL artifacts
+data/*.db-shm
+data/*.db-wal
+
+# Build info & IDE files
+*.tsbuildinfo
+.zcodeignore

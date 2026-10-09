@@ -81,6 +81,18 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- System Error Log Table (Structured Operational Errors)
+CREATE TABLE IF NOT EXISTS system_errors (
+    id TEXT PRIMARY KEY,
+    area TEXT NOT NULL,
+    endpoint TEXT,
+    severity TEXT DEFAULT 'ERROR',
+    status TEXT DEFAULT 'UNRESOLVED',
+    message TEXT NOT NULL,
+    details TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indices for faster query lookups
 CREATE INDEX IF NOT EXISTS idx_complaints_tracking_id ON complaints(tracking_id);
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status);
@@ -89,5 +101,7 @@ CREATE INDEX IF NOT EXISTS idx_complaints_created_by_id ON complaints(created_by
 CREATE INDEX IF NOT EXISTS idx_evidence_complaint_id ON evidence(complaint_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
+CREATE INDEX IF NOT EXISTS idx_system_errors_timestamp ON system_errors(timestamp);
+CREATE INDEX IF NOT EXISTS idx_system_errors_severity ON system_errors(severity);
 CREATE INDEX IF NOT EXISTS idx_ai_reports_image_sha256 ON ai_reports(image_sha256);
 CREATE INDEX IF NOT EXISTS idx_ai_reports_image_phash ON ai_reports(image_phash);

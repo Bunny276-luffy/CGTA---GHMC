@@ -53,35 +53,35 @@ export default function ServiceToSocietySection() {
   const items: ImpactItem[] = [
     {
       id: "infra",
-      badge: "100m GPS Geofence Lock",
-      title: "Infrastructure Protection",
-      description: "Protects public road and sanitation budget integrity using mathematical 100m GPS geofencing. Contractors cannot submit fake resolution claims.",
-      metric: "100% Tax Budget Security",
-      metricSub: "Zero False Claims",
-      color: "text-cyan-400",
-      glowColor: "shadow-cyan-500/40 border-cyan-500/70 bg-cyan-950/90",
-      borderColor: "border-cyan-500/40 bg-black/90",
-      icon: <Building2 className="h-6 w-6 text-cyan-400" />
+      badge: "100m GPS Geofence Rule",
+      title: "Deterministic Geofencing",
+      description: "Resolution claims are checked server-side against a deterministic 100 m geofence rule using the officer's on-site GPS. Evidence outside tolerance is routed to audit instead of being accepted.",
+      metric: "Rule-Based Validation",
+      metricSub: "Fail-Closed Design",
+      color: "text-indigo-400",
+      glowColor: "shadow-indigo-500/40 border-indigo-500/70 bg-indigo-950/90",
+      borderColor: "border-indigo-500/40 bg-black/90",
+      icon: <Building2 className="h-6 w-6 text-indigo-400" />
     },
     {
       id: "empower",
-      badge: "EXIF Anti-Forgery Seal",
-      title: "Citizen Empowerment",
-      description: "Guarantees authentic citizen complaints are ingested without administrative delay or bias. Camera EXIF metadata analysis seals proof of upload.",
-      metric: "Equal Priority Routing",
-      metricSub: "Zero Bureaucratic Delay",
-      color: "text-purple-400",
-      glowColor: "shadow-purple-500/40 border-purple-500/70 bg-purple-950/90",
-      borderColor: "border-purple-500/40 bg-black/90",
-      icon: <HeartHandshake className="h-6 w-6 text-purple-400" />
+      badge: "EXIF & Duplicate Signals",
+      title: "Evidence Quality Signals",
+      description: "Camera metadata, error-level analysis, and SHA-256 / perceptual-hash duplicate checks give reviewers evidence-based signals about each submission. Signals inform review — they never auto-reject a citizen.",
+      metric: "Explainable Assessment",
+      metricSub: "Signals, Not Verdicts",
+      color: "text-amber-400",
+      glowColor: "shadow-amber-500/40 border-amber-500/70 bg-amber-950/90",
+      borderColor: "border-amber-500/40 bg-black/90",
+      icon: <HeartHandshake className="h-6 w-6 text-amber-400" />
     },
     {
       id: "audit",
-      badge: "TPA Auditor Verification",
-      title: "Transparent Public Audit",
-      description: "Provides publicly auditable digital logs so citizens and neutral third-party auditors (TPA) can verify resolution timestamps with complete openness.",
-      metric: "Public Ledger Audit",
-      metricSub: "100% Auditable Logs",
+      badge: "TPA Audit Trail",
+      title: "Auditable Accountability",
+      description: "Every status change, assignment, and disputed resolution is recorded in the audit ledger with the actor, timestamp, and verification facts. Disputed resolutions escalate to third-party audit review.",
+      metric: "Complete Audit Trail",
+      metricSub: "Every Action Recorded",
       color: "text-emerald-400",
       glowColor: "shadow-emerald-500/40 border-emerald-500/70 bg-emerald-950/90",
       borderColor: "border-emerald-500/40 bg-black/90",
@@ -118,7 +118,7 @@ export default function ServiceToSocietySection() {
 
         {/* BIG Title (Fully Visible, No Descender Clipping) */}
         <div className="text-center space-y-4 max-w-full mx-auto px-4 py-2 overflow-visible">
-          <h2 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight font-sans text-center leading-normal pb-3 block w-full whitespace-nowrap text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-purple-200 to-emerald-300 drop-shadow-[0_0_25px_rgba(56,189,248,0.5)] overflow-visible">
+          <h2 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight font-sans text-center leading-normal pb-3 block w-full whitespace-nowrap text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 via-indigo-300 to-emerald-300 overflow-visible">
             Empowering Service to Society
           </h2>
         </div>

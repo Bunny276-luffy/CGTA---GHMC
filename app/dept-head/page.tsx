@@ -2,251 +2,329 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { t, SupportedLanguage } from "@/lib/i18n";
 import {
   ShieldCheck,
   LogOut,
-  TrendingUp,
   Users,
   Clock,
-  AlertCircle,
-  MapPin,
-  Sun,
-  Moon,
-  ArrowRight,
   BarChart3,
-  Scale,
-  CheckCircle2,
-  Activity
+  AlertTriangle,
+  Globe,
+  CheckCircle,
+  MapPin,
+  RefreshCw,
+  Search
 } from "lucide-react";
+import { fetchSessionUser, logoutAndRedirect, StoredUser } from "../../lib/client-auth";
 
-interface ComplaintStat {
+interface SlaState {
+  deadlineHours: number;
+  warnAtPercent: number;
+  state: "ON_TRACK" | "WARNING" | "OVERDUE";
+  ageHours: number;
+}
+
+interface ComplaintRow {
   id: string;
   trackingId: string;
+  title: string;
   category: string;
   status: string;
   severity: string;
+  address: string;
   createdAt: string;
+  assignedOfficerId?: string | null;
+  rejectionCount: number;
+  sla?: SlaState | null;
+  suggestedDepartment?: string | null;
 }
+
+interface DirectoryUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+const OPEN_STATUSES = ["SUBMITTED", "ASSIGNED", "IN_PROGRESS", "TPA_REVIEW"];
 
 export default function DeptHeadDashboard() {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
-  const [complaints, setComplaints] = useState<ComplaintStat[]>([]);
+  const [currentUser, setCurrentUser] = useState<StoredUser | null>(null);
+  const [lang, setLang] = useState<SupportedLanguage>("en");
+  const [complaints, setComplaints] = useState<ComplaintRow[]>([]);
+  const [officers, setOfficers] = useState<DirectoryUser[]>([]);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [assignSelections, setAssignSelections] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    let user;
-    try {
-      const userStr = localStorage.getItem("user");
-      if (!userStr) {
-        router.push("/login");
-        return;
-      }
-      user = JSON.parse(userStr);
-      if (!user || user.role !== "ADMIN") {
-        router.push("/login");
+
+    const bootstrap = async () => {
+      const user = await fetchSessionUser(["DEPT_HEAD", "ADMIN"]);
+      if (!user) {
+        router.push("/dept-head/login");
         return;
       }
       setCurrentUser(user);
-    } catch (e) {
-      router.push("/login");
-      return;
-    }
 
-    const fetchGrievanceStats = async () => {
       try {
-        const res = await fetch(`/api/complaints/track?userId=${user.id}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setComplaints(data);
-          }
+        const [complaintsRes, overviewRes] = await Promise.all([
+          fetch("/api/complaints", { credentials: "same-origin" }),
+          fetch("/api/admin/overview", { credentials: "same-origin" })
+        ]);
+
+        if (complaintsRes.status === 401 || overviewRes.status === 401) {
+          router.push("/dept-head/login");
+          return;
+        }
+
+        if (complaintsRes.ok) {
+          const data = await complaintsRes.json();
+          if (Array.isArray(data)) setComplaints(data);
+        }
+
+        if (overviewRes.ok) {
+          const data = await overviewRes.json();
+          setOfficers(Array.isArray(data.users) ? data.users.filter((u: DirectoryUser) => u.role === "OFFICER") : []);
         }
       } catch (err) {
-        console.warn("Could not load department complaints:", err);
+        console.warn("Could not load department data:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchGrievanceStats();
+    bootstrap();
   }, [router]);
 
-  useEffect(() => {
-    const root = window.document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-      root.classList.remove("light");
-    } else {
-      root.classList.add("light");
-      root.classList.remove("dark");
+  const applyTransition = async (complaintId: string, status: string, extras: Record<string, unknown> = {}) => {
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/complaints/${complaintId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ status, ...extras })
+      });
+      const data = await res.json();
+      if (res.status === 401) {
+        router.push("/dept-head/login");
+        return null;
+      }
+      if (!res.ok) {
+        throw new Error(data.message || "Action rejected by the server");
+      }
+      return data;
+    } catch (err: any) {
+      setActionError(err?.message ? `Action failed: ${err.message}` : "Action failed. Please try again.");
+      return null;
     }
-  }, [theme]);
+  };
 
-  const toggleTheme = () => {
-    setTheme(prev => prev === "light" ? "dark" : "light");
+  const handleAssign = async (c: ComplaintRow) => {
+    const officerId = assignSelections[c.id];
+    if (!officerId) return;
+    const result = await applyTransition(c.id, "ASSIGNED", { assignedOfficerId: officerId });
+    if (!result) return;
+    setComplaints(prev => prev.map(x => x.id === c.id ? { ...x, status: "ASSIGNED", assignedOfficerId: officerId } : x));
+    setAssignSelections(prev => ({ ...prev, [c.id]: "" }));
+  };
+
+  const handleEscalate = async (c: ComplaintRow) => {
+    const result = await applyTransition(c.id, "TPA_REVIEW", { notes: "Escalated to supervisor audit by department head" });
+    if (!result) return;
+    setComplaints(prev => prev.map(x => x.id === c.id ? { ...x, status: "TPA_REVIEW" } : x));
   };
 
   const logout = () => {
-    localStorage.clear();
-    router.push("/login");
+    logoutAndRedirect(router, "/dept-head/login");
   };
 
   const total = complaints.length;
-  const resolved = complaints.filter(c => c.status === "RESOLVED" || c.status === "CLOSED").length;
-  const inProgress = complaints.filter(c => c.status === "IN_PROGRESS").length;
-  const resolutionRate = total > 0 ? ((resolved / total) * 100).toFixed(1) : "100.0";
+  const openCases = complaints.filter(c => OPEN_STATUSES.includes(c.status));
+  const overdueCases = openCases.filter(c => c.sla?.state === "OVERDUE");
+  const resolvedCount = complaints.filter(c => c.status === "RESOLVED" || c.status === "CLOSED").length;
+  const resolutionRate = total > 0 ? ((resolvedCount / total) * 100).toFixed(1) : "0.0";
 
-  if (!mounted || !currentUser) {
+  const officerWorkload = officers.map(o => ({
+    ...o,
+    assigned: complaints.filter(c => c.assignedOfficerId === o.id && OPEN_STATUSES.includes(c.status)).length
+  })).sort((a, b) => b.assigned - a.assigned);
+
+  if (!mounted || loading) {
     return (
-      <div className="min-h-screen bg-[#030308] flex items-center justify-center p-8 text-amber-400 font-bold font-mono text-center">
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 text-slate-900 font-bold text-center">
         <div className="flex items-center gap-3">
-          <div className="h-5 w-5 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
-          <span>Initializing Executive Analytics Console...</span>
+          <div className="h-5 w-5 rounded-full border-2 border-blue-700 border-t-transparent animate-spin" />
+          <span>Opening Department Operations Desk...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 flex flex-col md:flex-row ${
-      theme === "dark" ? "bg-[#030308] text-slate-100" : "bg-[#f8fafc] text-slate-900"
-    }`}>
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
 
-      {/* Sidebar Navigation */}
-      <aside className={`w-full md:w-64 border-b md:border-b-0 md:border-r p-5 flex flex-col justify-between flex-shrink-0 z-20 ${
-        theme === "dark" ? "bg-[#0c0804]/90 backdrop-blur-md border-amber-500/10" : "bg-white border-slate-200 shadow-sm"
-      }`}>
-        <div>
-          <div className="flex items-center gap-2.5 mb-8">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-amber-500 to-rose-600 flex items-center justify-center shadow-md shadow-amber-500/20">
-              <ShieldCheck className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <span className={`text-sm font-black tracking-wider ${theme === "dark" ? "text-white" : "text-slate-900"}`}>
-                EXECUTIVE<span className="text-amber-400">DESK</span>
-              </span>
-              <p className="text-[9px] font-mono text-slate-400">GHMC Executive Analytics</p>
-            </div>
+      {/* Header */}
+      <header className="sticky top-0 z-30 bg-slate-900 text-white px-5 py-3 border-b border-slate-800 flex items-center justify-between gap-4 shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 bg-blue-700 rounded-lg flex items-center justify-center font-bold text-white shadow-sm">
+            <ShieldCheck className="h-5 w-5" />
           </div>
-
-          <div className="space-y-1 text-left">
-            <button
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all border ${
-                theme === "dark"
-                  ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                  : "bg-amber-50 text-amber-900 border-amber-200"
-              }`}
-            >
-              <BarChart3 className="h-4 w-4" />
-              <span>Department Volumetrics</span>
-            </button>
+          <div>
+            <span className="text-base font-bold tracking-tight block leading-tight">{t("depthead.title", lang)}</span>
+            <span className="text-[11px] text-slate-400 block font-normal">{currentUser?.name || "Department Head"} ({t("app.municipality", lang)})</span>
           </div>
         </div>
 
-        <div className="pt-6 border-t space-y-3 border-slate-200 dark:border-white/5">
-          <div className="flex items-center justify-between text-xs px-2">
-            <span className="text-slate-400 truncate max-w-[140px] font-mono text-[11px]">{currentUser.email}</span>
-            <button
-              onClick={toggleTheme}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-slate-800 text-slate-400 hover:text-white"
+        <div className="flex items-center gap-2">
+          {/* Language Selector */}
+          <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700 text-xs">
+            <Globe className="h-3.5 w-3.5 text-slate-400 ml-1" />
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as SupportedLanguage)}
+              className="bg-transparent text-white text-xs font-semibold outline-none cursor-pointer py-1 pr-1"
             >
-              {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-            </button>
+              <option value="en" className="bg-slate-900 text-white">English</option>
+              <option value="hi" className="bg-slate-900 text-white">हिंदी</option>
+              <option value="te" className="bg-slate-900 text-white">తెలుగు</option>
+            </select>
           </div>
 
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 transition-all"
+            className="p-2 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 font-bold text-xs flex items-center gap-1 min-h-[44px]"
+            title={t("nav.logout", lang)}
           >
-            <LogOut className="h-3.5 w-3.5" />
-            Sign Out
+            <LogOut className="h-4 w-4" />
           </button>
         </div>
-      </aside>
+      </header>
 
-      {/* Main Content Workspace */}
-      <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-6xl mx-auto w-full space-y-6">
+      {/* Main Container */}
+      <main className="flex-1 px-4 sm:px-6 py-6 max-w-7xl mx-auto w-full pb-20 space-y-6">
 
-        <header className="flex justify-between items-center border-b pb-4 border-slate-200 dark:border-white/5">
-          <div className="text-left">
-            <h1 className={`text-xl font-black ${theme === "dark" ? "text-white" : "text-slate-900"}`}>
-              Department Executive Volumetrics
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">Municipal resource allocation, resolution velocity, and SLA telemetry</p>
+        {actionError && (
+          <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-300 flex items-center gap-2 text-xs text-rose-900 font-bold">
+            <AlertTriangle className="h-4 w-4 text-rose-700 flex-shrink-0" />
+            <span>{actionError}</span>
           </div>
-        </header>
+        )}
 
-        {/* KPIs Summary Cards Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-left">
-          <div className={`p-5 rounded-2xl border ${theme === "dark" ? "bg-slate-950/40 border-white/5" : "bg-white border-slate-200 shadow-sm"}`}>
-            <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Resolution Rate</span>
-            <div className="flex items-center gap-2 mt-2">
-              <h3 className={`text-2xl font-mono font-black ${theme === "dark" ? "text-white" : "text-slate-900"}`}>{resolutionRate}%</h3>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">Verified on-chain resolutions</p>
+        {/* Operational Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-4 rounded-xl bg-white border border-slate-300 shadow-sm space-y-1">
+            <span className="text-xs font-bold text-slate-500 uppercase block">Total Volume</span>
+            <span className="text-2xl font-black text-slate-900">{total}</span>
           </div>
-
-          <div className={`p-5 rounded-2xl border ${theme === "dark" ? "bg-slate-950/40 border-white/5" : "bg-white border-slate-200 shadow-sm"}`}>
-            <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Pending Complaints</span>
-            <div className="flex items-center gap-2 mt-2">
-              <h3 className={`text-2xl font-mono font-black ${theme === "dark" ? "text-white" : "text-slate-900"}`}>{inProgress}</h3>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">Active field operations</p>
+          <div className="p-4 rounded-xl bg-white border border-slate-300 shadow-sm space-y-1">
+            <span className="text-xs font-bold text-slate-500 uppercase block">Active Workload</span>
+            <span className="text-2xl font-black text-blue-800">{openCases.length}</span>
           </div>
-
-          <div className={`p-5 rounded-2xl border ${theme === "dark" ? "bg-slate-950/40 border-white/5" : "bg-white border-slate-200 shadow-sm"}`}>
-            <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Avg SLA Speed</span>
-            <div className="flex items-center gap-2 mt-2">
-              <h3 className={`text-2xl font-mono font-black ${theme === "dark" ? "text-white" : "text-slate-900"}`}>14.8 Hrs</h3>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">Target turnaround: 24.0 Hrs</p>
+          <div className="p-4 rounded-xl bg-white border border-slate-300 shadow-sm space-y-1">
+            <span className="text-xs font-bold text-slate-500 uppercase block">SLA Overdue</span>
+            <span className="text-2xl font-black text-rose-700">{overdueCases.length}</span>
           </div>
-
-          <div className={`p-5 rounded-2xl border ${theme === "dark" ? "bg-slate-950/40 border-white/5" : "bg-white border-slate-200 shadow-sm"}`}>
-            <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">Total Grievances</span>
-            <div className="flex items-center gap-2 mt-2">
-              <h3 className={`text-2xl font-mono font-black ${theme === "dark" ? "text-white" : "text-slate-900"}`}>{total}</h3>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">Logged across all sectors</p>
+          <div className="p-4 rounded-xl bg-white border border-slate-300 shadow-sm space-y-1">
+            <span className="text-xs font-bold text-slate-500 uppercase block">Resolution Rate</span>
+            <span className="text-2xl font-black text-emerald-700">{resolutionRate}%</span>
           </div>
         </div>
 
-        {/* Operational Department Feed */}
-        <div className={`rounded-2xl border text-left p-6 ${
-          theme === "dark" ? "bg-slate-950/40 border-white/5" : "bg-white border-slate-200 shadow-sm"
-        }`}>
-          <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-white/5 mb-4">
-            <span className="text-xs font-mono font-bold uppercase text-slate-300">Department Inspection Overview</span>
-            <span className="text-[10px] font-mono text-emerald-400 font-bold">TELEMETRY ACTIVE</span>
+        {/* Workload & Escalation Workspace */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+          {/* Department Open Cases Queue */}
+          <div className="lg:col-span-8 space-y-4">
+            <div className="p-5 rounded-xl bg-white border border-slate-300 shadow-sm space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 uppercase">Department Pending Cases & Assignments</h3>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 border-b border-slate-300 text-slate-700 font-bold uppercase">
+                    <tr>
+                      <th className="px-4 py-3">Tracking ID</th>
+                      <th className="px-4 py-3">Headline</th>
+                      <th className="px-4 py-3">Category</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Assign Field Officer</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {openCases.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-6 text-center text-slate-500 font-medium">No open department grievances pending.</td>
+                      </tr>
+                    ) : (
+                      openCases.map(c => (
+                        <tr key={c.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-mono font-bold text-blue-900">{c.trackingId}</td>
+                          <td className="px-4 py-3 font-bold text-slate-900">{c.title}</td>
+                          <td className="px-4 py-3 text-slate-700">{c.category}</td>
+                          <td className="px-4 py-3 font-bold text-slate-800">{c.status}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2">
+                              <select
+                                value={assignSelections[c.id] || ""}
+                                onChange={(e) => setAssignSelections({ ...assignSelections, [c.id]: e.target.value })}
+                                className="min-h-[36px] px-2 rounded border border-slate-300 bg-white text-xs outline-none"
+                              >
+                                <option value="">Select Officer...</option>
+                                {officers.map(o => (
+                                  <option key={o.id} value={o.id}>{o.name}</option>
+                                ))}
+                              </select>
+                              <button
+                                onClick={() => handleAssign(c)}
+                                disabled={!assignSelections[c.id]}
+                                className="px-3 py-1.5 rounded bg-blue-700 text-white font-bold text-xs uppercase disabled:opacity-50 min-h-[36px]"
+                              >
+                                Assign
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
-          {complaints.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-xs space-y-2">
-              <Activity className="h-8 w-8 text-slate-500 mx-auto" />
-              <p>No active department grievances registered in the current billing period.</p>
+          {/* Officer Capacity Breakdown */}
+          <div className="lg:col-span-4 space-y-4">
+            <div className="p-5 rounded-xl bg-white border border-slate-300 shadow-sm space-y-3">
+              <h3 className="text-sm font-bold text-slate-900 uppercase">Field Officer Capacity</h3>
+              <div className="space-y-2 text-xs">
+                {officerWorkload.length === 0 ? (
+                  <p className="text-slate-500 font-medium">No field officers registered.</p>
+                ) : (
+                  officerWorkload.map(o => (
+                    <div key={o.id} className="p-3 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-slate-900 block">{o.name}</span>
+                        <span className="text-slate-500 text-[11px]">{o.email}</span>
+                      </div>
+                      <span className="px-2.5 py-1 rounded bg-blue-100 text-blue-900 border border-blue-300 font-bold font-mono">
+                        {o.assigned} Active
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="divide-y divide-white/5">
-              {complaints.map((c) => (
-                <div key={c.id} className="py-3 flex items-center justify-between text-xs">
-                  <div>
-                    <span className="font-mono text-amber-400 font-bold mr-2">{c.trackingId}</span>
-                    <span className="text-slate-300 font-medium">{c.category}</span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded text-[9px] font-mono bg-slate-800 text-slate-300">
-                    {c.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          </div>
+
         </div>
 
       </main>
+
     </div>
   );
 }

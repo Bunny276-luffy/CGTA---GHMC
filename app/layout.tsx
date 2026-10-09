@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
-import ThreeDGlobalBackground from "../components/ThreeDGlobalBackground";
-import CustomCursor from "../components/CustomCursor";
 import MobileBottomBar from "../components/MobileBottomBar";
 import PWARegister from "../components/PWARegister";
+import { ErrorBoundary } from "../components/ErrorBoundary";
+
+
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -19,15 +20,15 @@ const inter = Inter({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#6366f1",
+  themeColor: "#1e3a8a",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
 };
 
 export const metadata: Metadata = {
-  title: "CivicTrust (CGTA) | Official GHMC Municipal Grievance & Audit Platform",
-  description: "Official Greater Hyderabad Municipal Corporation AI-powered grievance validation, anti-fraud geofencing, and civic trust calculation platform.",
+  title: "CivicTrust | Official Public Grievance & Evidence Verification Platform",
+  description: "Official Greater Hyderabad Municipal Corporation (GHMC) public grievance registration, evidence validation, and municipal accountability platform.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -46,7 +47,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className="light" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -68,10 +69,7 @@ export default function RootLayout({
                       str.indexOf('inpage.js') !== -1 ||
                       str.indexOf('contentscript.js') !== -1 ||
                       str.indexOf('ExtendedBroadcastMessage') !== -1 ||
-                      str.indexOf('Channel secret not available') !== -1 ||
-                      str.indexOf('EthereumAdapter') !== -1 ||
-                      str.indexOf('SolanaAdapter') !== -1 ||
-                      str.indexOf('BinanceWeb3Provider') !== -1
+                      str.indexOf('Channel secret not available') !== -1
                     );
                   } catch (err) {
                     return false;
@@ -94,22 +92,26 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body suppressHydrationWarning className={`${plusJakarta.variable} ${inter.variable} antialiased min-h-screen bg-[#030308] text-slate-100 selection:bg-blue-500/20 selection:text-cyan-200 relative overflow-x-hidden pb-16 md:pb-0`}>
+      <body suppressHydrationWarning className={`${plusJakarta.variable} ${inter.variable} antialiased min-h-screen bg-slate-100 text-slate-900 selection:bg-blue-600/20 selection:text-blue-900 relative overflow-x-hidden pb-16 md:pb-0`}>
+        {/* Accessibility: skip navigation for keyboard and screen-reader users */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2.5 focus:rounded-lg focus:bg-blue-700 focus:text-white focus:text-xs focus:font-bold focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          Skip to main content
+        </a>
+
         {/* PWA Service Worker Registration */}
         <PWARegister />
 
-        {/* Global 3D Particle Space Background */}
-        <ThreeDGlobalBackground />
-        
-        {/* Custom pointer cursor trail */}
-        <CustomCursor />
-        
-        {/* Layout container */}
-        <div className="relative z-10 w-full min-h-screen flex flex-col bg-transparent">
-          {children}
+        {/* Clean layout container */}
+        <div id="main-content" className="relative z-10 w-full min-h-screen flex flex-col bg-slate-50">
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </div>
 
-        {/* Universal Mobile Fixed Bottom Bar */}
+        {/* Universal Mobile Navigation Bar */}
         <MobileBottomBar />
       </body>
     </html>

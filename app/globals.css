@@ -1,22 +1,42 @@
 @import "tailwindcss";
 
+/* Class-based dark mode: the dashboards toggle .dark/.light on <html>,
+   so the dark: variant must follow the class, not the OS color scheme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------
+   CivicTrust "Civic Ledger" design system v2 — professional
+   Ink-navy elevation ladder · indigo primary · hairline borders
+   · restrained motion (150–200ms, no glow, no bounce)
+   ------------------------------------------------------------------ */
 :root {
-  --background: 3 3 8;
-  --foreground: 220 220 225;
-  --blue-accent: 59 130 246;
-  --cyan-accent: 6 182 212;
+  --background: 247 249 252;      /* cool paper */
+  --foreground: 15 23 42;         /* slate-900 ink */
+  --surface: 255 255 255;         /* card */
+  --surface-raised: 255 255 255;  /* raised card (shadow distinguishes) */
+  --surface-sunken: 241 245 249;  /* wells, code strips */
+  --hairline: 226 232 240;        /* slate-200 */
+  --hairline-strong: 203 213 225; /* slate-300 */
+  --brand: 79 70 229;             /* indigo-600 */
+  --brand-strong: 67 56 202;      /* indigo-700 */
+  --accent: 217 119 6;            /* amber-600 — institutional, not neon */
+  --focus-ring: 165 180 252;      /* indigo-300 */
+}
+
+html.dark {
+  --background: 8 13 26;          /* ink navy base */
+  --foreground: 226 232 240;      /* slate-200 */
+  --surface: 17 26 46;            /* card surface */
+  --surface-raised: 22 33 56;     /* raised card */
+  --surface-sunken: 12 19 35;     /* wells, code strips */
+  --hairline: 33 45 71;           /* slate-800-ish */
+  --hairline-strong: 45 58 89;
 }
 
 /* Accessibility Font Resizing Classes */
-html.text-scale-normal {
-  font-size: 16px;
-}
-html.text-scale-large {
-  font-size: 18px;
-}
-html.text-scale-xlarge {
-  font-size: 20px;
-}
+html.text-scale-normal { font-size: 16px; }
+html.text-scale-large { font-size: 18px; }
+html.text-scale-xlarge { font-size: 20px; }
 
 /* Government High Contrast Mode */
 html.gov-high-contrast {
@@ -27,7 +47,8 @@ html.gov-high-contrast body {
   color: #ffffff !important;
 }
 html.gov-high-contrast .glass-panel,
-html.gov-high-contrast .glass-panel-glow {
+html.gov-high-contrast .glass-panel-glow,
+html.gov-high-contrast .ct-panel {
   background: #000000 !important;
   border-color: #ffffff !important;
 }
@@ -48,45 +69,169 @@ h1, h2, h3, h4, h5, h6, .font-heading {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(3, 3, 8, 0.95);
+  background: rgb(var(--background));
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(59, 130, 246, 0.25);
+  background: rgba(99, 102, 241, 0.35);
   border-radius: 9px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(6, 182, 212, 0.4);
+  background: rgba(99, 102, 241, 0.6);
 }
 
-/* Glassmorphic Panel Styles */
-.glass-panel {
-  background: rgba(10, 10, 20, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(59, 130, 246, 0.08);
-  box-shadow: 0 8px 32px 0 rgba(3, 3, 8, 0.45);
+::selection {
+  background: rgba(99, 102, 241, 0.25);
 }
 
-.glass-panel-glow {
-  background: rgba(10, 10, 20, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(6, 182, 212, 0.18);
-  box-shadow: 0 0 25px rgba(6, 182, 212, 0.08);
+/* ------------------------------------------------------------------
+   Shared component classes — restrained, institutional
+   ------------------------------------------------------------------ */
+
+/* Panel: card surface with hairline border and a single soft shadow */
+.ct-panel {
+  background: rgb(var(--surface));
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgba(2, 8, 20, 0.05);
+}
+html.dark .ct-panel {
+  box-shadow: 0 1px 3px rgba(2, 6, 16, 0.35);
 }
 
-/* Text glow filters */
-.text-glow-blue {
-  text-shadow: 0 0 15px rgba(59, 130, 246, 0.45);
+/* Raised panel: sits above ct-panel in the elevation ladder */
+.ct-panel-raised {
+  background: rgb(var(--surface-raised));
+  border: 1px solid rgb(var(--hairline-strong));
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 16px rgba(2, 8, 20, 0.08);
+}
+html.dark .ct-panel-raised {
+  box-shadow: 0 6px 20px rgba(2, 6, 16, 0.45);
 }
 
-.text-glow-cyan {
-  text-shadow: 0 0 15px rgba(6, 182, 212, 0.45);
+/* Sunken well: code strips, telemetry rows, meta blocks */
+.ct-well {
+  background: rgb(var(--surface-sunken));
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 0.6rem;
+}
+
+/* Buttons — flat institutional styling; motion limited to color shifts */
+.ct-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0 1.1rem;
+  border-radius: 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: background-color .16s ease-out, border-color .16s ease-out, color .16s ease-out;
+  cursor: pointer;
+}
+.ct-btn:active { transform: none; }
+
+.ct-btn-primary {
+  background: rgb(var(--brand));
+  color: #ffffff;
+  border: 1px solid rgb(var(--brand-strong));
+}
+.ct-btn-primary:hover { background: rgb(var(--brand-strong)); }
+
+.ct-btn-outline {
+  background: rgb(var(--surface));
+  color: rgb(var(--foreground));
+  border: 1px solid rgb(var(--hairline));
+}
+.ct-btn-outline:hover { border-color: rgb(var(--brand)); color: rgb(var(--brand)); }
+
+.ct-btn-ghost {
+  background: transparent;
+  color: rgb(var(--foreground));
+  border: 1px solid transparent;
+}
+.ct-btn-ghost:hover { background: rgba(99, 102, 241, 0.09); color: rgb(var(--brand)); }
+
+/* Chips / status tags */
+.ct-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  border: 1px solid rgb(var(--hairline));
+  font-family: var(--font-body), monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Inputs */
+.ct-input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0.65rem 0.9rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgb(var(--hairline-strong));
+  background: rgb(var(--surface));
+  color: rgb(var(--foreground));
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color .15s ease-out, box-shadow .15s ease-out;
+}
+.ct-input::placeholder { color: rgba(100, 116, 139, 0.8); }
+.ct-input:focus {
+  border-color: rgb(var(--brand));
+  box-shadow: 0 0 0 3px rgba(165, 180, 252, 0.22);
+}
+
+/* Focus visibility for keyboard users */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid rgb(var(--focus-ring));
+  outline-offset: 2px;
 }
 
 /* Touch Targets for Mobile Devices */
 button, a, input, select, textarea {
   touch-action: manipulation;
+}
+
+/* Accessibility: honour the OS reduced-motion preference (GIGW/WCAG) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Legacy surface classes — repointed to the new panel language so every
+   existing usage inherits the redesign.
+   ------------------------------------------------------------------ */
+.glass-panel {
+  background: rgb(var(--surface));
+  border: 1px solid rgb(var(--hairline));
+  box-shadow: 0 1px 2px rgba(2, 8, 20, 0.05);
+}
+
+.glass-panel-glow {
+  background: rgb(var(--surface));
+  border: 1px solid rgb(var(--hairline));
+  box-shadow: 0 1px 2px rgba(2, 8, 20, 0.05);
+}
+html.dark .glass-panel-glow {
+  box-shadow: 0 8px 28px rgba(2, 8, 20, 0.45);
+}
+
+/* Text glow filters — retired with the neon look */
+.text-glow-blue, .text-glow-cyan {
+  text-shadow: none;
 }
 
 /* Slide Up Animation */
@@ -105,14 +250,6 @@ button, a, input, select, textarea {
   animation: fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.delay-100 {
-  animation-delay: 100ms;
-}
-
-.delay-200 {
-  animation-delay: 200ms;
-}
-
-.delay-300 {
-  animation-delay: 300ms;
-}
+.delay-100 { animation-delay: 100ms; }
+.delay-200 { animation-delay: 200ms; }
+.delay-300 { animation-delay: 300ms; }

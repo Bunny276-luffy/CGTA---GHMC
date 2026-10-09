@@ -1,0 +1,77 @@
+{
+  "deployment": {
+    "id": "CGTA-GHMC",
+    "description": "CivicTrust pilot deployment configured for the Greater Hyderabad Municipal Corporation civic structure.",
+    "state": "Telangana",
+    "district": "Hyderabad District",
+    "localBodyType": "Municipal Corporation",
+    "localBodyName": "Greater Hyderabad Municipal Corporation",
+    "localBodyShortName": "GHMC",
+    "hierarchy": ["Zone", "Circle", "Ward"],
+    "jurisdictionStats": "6 zones / 30 circles / 150 wards (modelled on the current published GHMC structure)",
+    "boundaryDataset": "data/boundaries/ghmc-boundary.json"
+  },
+  "departments": [
+    {
+      "id": "roads",
+      "name": "Roads & Engineering",
+      "categories": ["Roads & Potholes"],
+      "escalationAuthority": "DEPT_HEAD"
+    },
+    {
+      "id": "drainage",
+      "name": "Drainage & Water Board",
+      "categories": ["Drainage & Water Leakage"],
+      "escalationAuthority": "DEPT_HEAD"
+    },
+    {
+      "id": "sanitation",
+      "name": "Sanitation & Waste Management",
+      "categories": ["Garbage & Waste"],
+      "escalationAuthority": "DEPT_HEAD"
+    },
+    {
+      "id": "lighting",
+      "name": "Street Lighting & Electrical",
+      "categories": ["Street Lighting & Electrical"],
+      "escalationAuthority": "DEPT_HEAD"
+    },
+    {
+      "id": "veterinary",
+      "name": "Veterinary & Stray Animal Control",
+      "categories": ["Veterinary & Stray Animal Control"],
+      "escalationAuthority": "DEPT_HEAD"
+    }
+  ],
+  "serviceCategories": [
+    { "id": "Roads & Potholes", "label": "Roads & Potholes", "description": "Damaged road, open trench", "group": "Infrastructure" },
+    { "id": "Drainage & Water Leakage", "label": "Drainage & Water", "description": "Overflowing drain, pipe leak", "group": "Drainage" },
+    { "id": "Garbage & Waste", "label": "Garbage & Sanitation", "description": "Dumped waste, uncollected bin", "group": "Sanitation" },
+    { "id": "Street Lighting & Electrical", "label": "Streetlights & Wire", "description": "Dark lamp, hanging cable", "group": "Electricity / Lighting" },
+    { "id": "Veterinary & Stray Animal Control", "label": "Stray Animals", "description": "Nuisance, health hazard", "group": "Public health" }
+  ],
+  "slaPolicies": {
+    "EMERGENCY": { "hours": 24, "warnAtPercent": 75 },
+    "HIGH": { "hours": 72, "warnAtPercent": 75 },
+    "STANDARD": { "hours": 168, "warnAtPercent": 75 },
+    "default": { "hours": 168, "warnAtPercent": 75 }
+  },
+  "escalationRules": {
+    "slaBreachStatus": "TPA_REVIEW",
+    "unassignedAfterHours": 48,
+    "escalationNote": "Open complaints past their configured SLA deadline are escalated to third-party audit review; every escalation is recorded in the audit ledger and the owner is notified."
+  },
+  "verification": {
+    "gpsToleranceMeters": 100,
+    "duplicateRadiusMeters": 50,
+    "manualReviewTrustThreshold": 60,
+    "highTrustThreshold": 70,
+    "maxPhotoBytes": 6291456
+  },
+  "languages": {
+    "default": "en",
+    "fallback": "en",
+    "enabled": ["en", "hi", "te"],
+    "note": "Language list is configuration, not a hard-coded application constant. Additional resources can be added per deployment (see INTEGRATIONS.md for BHASHINI)."
+  }
+}

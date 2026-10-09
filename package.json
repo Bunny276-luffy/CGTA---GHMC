@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:migrate": "tsx scripts/migrate.ts",
-    "preflight": "tsx scripts/preflight.ts"
+    "preflight": "tsx scripts/preflight.ts",
+    "db:seed": "tsx scripts/seed-accounts.ts"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.0.0",

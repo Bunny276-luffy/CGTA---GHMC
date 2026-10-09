@@ -1,140 +1,89 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { ShieldCheck, ArrowLeft, TrendingUp, CheckCircle, ShieldAlert, Award } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { ShieldCheck, ArrowLeft, CheckCircle, ShieldAlert, Award, AlertTriangle, TrendingUp, Layers } from "lucide-react";
 import Link from "next/link";
 
-interface LeaderboardRow {
-  rank: string;
-  ward: string;
-  response: string;
-  trust: string;
-  resolved: number;
+interface PublicStats {
+  complaints: {
+    total: number;
+    submitted: number;
+    assigned: number;
+    inProgress: number;
+    resolved: number;
+    tpaReview: number;
+  };
+  categories: { category: string; count: number }[];
+  verification: {
+    evidenceAudited: number;
+    avgTrustScore: number;
+    highTrust: number;
+    lowTrust: number;
+    duplicatesFlagged: number;
+    manipulationFlagged: number;
+  };
+  generatedAt: string;
 }
 
 export default function PublicStatsPage() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [data, setData] = useState<PublicStats | null>(null);
+  const [dbUnavailable, setDbUnavailable] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const leaderboard: LeaderboardRow[] = [
-    { rank: "01", ward: "Zone 1 - Khairatabad / Jubilee Hills", response: "11.2 Hrs", trust: "98.4%", resolved: 942 },
-    { rank: "02", ward: "Zone 2 - Serilingampally / HITEC City", response: "12.8 Hrs", trust: "96.5%", resolved: 1104 },
-    { rank: "03", ward: "Zone 3 - Secunderabad / Begumpet", response: "14.1 Hrs", trust: "95.2%", resolved: 819 },
-    { rank: "04", ward: "Zone 4 - Kukatpally / KPHB", response: "15.6 Hrs", trust: "93.8%", resolved: 730 },
-    { rank: "05", ward: "Zone 5 - Charminar / Old City", response: "17.4 Hrs", trust: "91.5%", resolved: 650 },
-    { rank: "06", ward: "Zone 6 - LB Nagar / Dilsukhnagar", response: "18.2 Hrs", trust: "90.1%", resolved: 590 },
-  ];
+  const load = async () => {
+    setLoading(true);
+    setDbUnavailable(false);
+    try {
+      const res = await fetch("/api/public/stats");
+      if (res.ok) {
+        setData(await res.json());
+      } else if (res.status >= 500) {
+        setDbUnavailable(true);
+      }
+    } catch {
+      setDbUnavailable(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let animId: number;
-
-    const nodes = [
-      { x: 90, y: 120, size: 30, value: 0.8, name: "Sub-Zone A" },
-      { x: 180, y: 70, size: 45, value: 0.95, name: "Sub-Zone B" },
-      { x: 260, y: 160, size: 25, value: 0.6, name: "Sub-Zone C" },
-      { x: 140, y: 220, size: 50, value: 0.85, name: "Sub-Zone D" },
-    ];
-
-    const drawHeatmap = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const w = canvas.width;
-      const h = canvas.height;
-
-      // Draw grid coordinates in dark mode
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.02)";
-      ctx.lineWidth = 1;
-      for (let i = 20; i < w; i += 20) {
-        ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i, h);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(0, i);
-        ctx.lineTo(w, i);
-        ctx.stroke();
-      }
-
-      ctx.strokeStyle = "rgba(59, 130, 246, 0.1)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(40, 60);
-      ctx.quadraticCurveTo(150, 20, 240, 80);
-      ctx.quadraticCurveTo(340, 120, 300, 220);
-      ctx.quadraticCurveTo(240, 260, 120, 240);
-      ctx.quadraticCurveTo(20, 200, 40, 60);
-      ctx.stroke();
-
-      nodes.forEach((node) => {
-        const pulse = 1 + Math.sin(Date.now() * 0.003 + node.x) * 0.08;
-        const radius = node.size * pulse;
-
-        const grad = ctx.createRadialGradient(node.x, node.y, 2, node.x, node.y, radius);
-
-        if (node.value > 0.9) {
-          grad.addColorStop(0, "rgba(244, 63, 94, 0.55)"); // Crimson
-          grad.addColorStop(0.3, "rgba(244, 63, 94, 0.25)");
-          grad.addColorStop(0.7, "rgba(245, 158, 11, 0.08)");
-          grad.addColorStop(1, "rgba(245, 158, 11, 0)");
-        } else {
-          grad.addColorStop(0, "rgba(245, 158, 11, 0.5)");
-          grad.addColorStop(0.4, "rgba(245, 158, 11, 0.2)");
-          grad.addColorStop(0.8, "rgba(59, 130, 246, 0.05)");
-          grad.addColorStop(1, "rgba(59, 130, 246, 0)");
-        }
-
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = node.value > 0.9 ? "rgba(244, 63, 94, 0.7)" : "rgba(245, 158, 11, 0.7)";
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-        ctx.font = "8px monospace";
-        ctx.fillText(`${node.name}`, node.x - 20, node.y - 8);
-      });
-
-      animId = requestAnimationFrame(drawHeatmap);
-    };
-
-    drawHeatmap();
-    return () => cancelAnimationFrame(animId);
+    load();
   }, []);
 
+  const complaints = data?.complaints;
+  const verification = data?.verification;
+  const categories = data?.categories ?? [];
+
   return (
-    <div className="relative min-h-screen bg-[#030308] text-slate-100 flex flex-col">
+    <div className="relative min-h-screen bg-[#0A0F1E] text-slate-100 flex flex-col">
       <div className="absolute top-[10%] left-[5%] h-[500px] w-[500px] rounded-full bg-blue-500/5 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[10%] right-[5%] h-[500px] w-[500px] rounded-full bg-indigo-500/5 blur-[120px] pointer-events-none" />
 
-      <header className="border-b border-white/5 bg-[#030308]/75 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-white/5 bg-[#0A0F1E]/75 backdrop-blur-md sticky top-0 z-50">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-6">
             <Link
-              href="/login"
+              href="/"
               className="h-9 w-9 bg-slate-900 border border-white/5 hover:border-blue-500/20 text-slate-400 hover:text-white rounded-lg flex items-center justify-center transition-all shadow-sm"
             >
-              <ArrowLeft className="h-4.5 w-4.5" />
+              <ArrowLeft className="h-4 w-4" />
             </Link>
             <div className="flex items-center gap-2">
               <div className="h-7 w-7 rounded bg-gradient-to-tr from-blue-500 to-indigo-700 flex items-center justify-center">
-                <ShieldCheck className="h-4.5 w-4.5 text-white" />
+                <ShieldCheck className="h-4 w-4 text-white" />
               </div>
               <span className="text-sm font-black tracking-wider text-white">
                 CIVIC<span className="text-blue-400">TRUST</span>
               </span>
             </div>
           </div>
-          <span className="text-xs text-teal-405 text-teal-400 font-bold bg-teal-950/20 px-3 py-1 rounded-full border border-teal-500/10">
-            Open Civic Data Ledger
+          <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+            dbUnavailable
+              ? "text-rose-400 bg-rose-950/20 border-rose-500/20"
+              : "text-indigo-400 bg-indigo-950/20 border-indigo-500/10"
+          }`}>
+            {dbUnavailable ? "Ledger Unavailable" : "Open Civic Data Ledger"}
           </span>
         </div>
       </header>
@@ -144,104 +93,177 @@ export default function PublicStatsPage() {
         <div className="lg:col-span-7 space-y-8 text-left">
 
           <div>
-            <h2 className="text-2xl font-black text-white text-glow">Civic Transparency Metrics</h2>
-            <p className="text-xs text-slate-500 mt-1">Real-time public performance tracking of municipal zones</p>
+            <h2 className="text-2xl font-black text-white text-glow">Public Transparency Ledger</h2>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              Live aggregate figures computed directly from the grievance ledger. When the ledger is
+              empty, the figures below are zero — no placeholder statistics are shown.
+            </p>
+            <p className="text-[10px] text-slate-600 mt-2 leading-relaxed">
+              CivicTrust is a project implementation modelled on the current GHMC 6-zone / 30-circle /
+              150-ward administrative structure. It is not an official GHMC deployment.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="glass-panel p-5 rounded-xl border-white/5 flex gap-3 items-center">
-              <div className="h-9 w-9 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
-                <CheckCircle className="h-5 w-5" />
+          {dbUnavailable && (
+            <div className="p-5 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-3">
+              <div className="flex items-start gap-2.5 text-xs text-rose-400">
+                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>
+                  DATABASE UNAVAILABLE — live statistics cannot be loaded. This page will not display
+                  placeholder data.
+                </span>
               </div>
-              <div>
-                <h4 className="text-sm text-slate-450 text-slate-405 text-slate-400">Ledgers Closed</h4>
-                <p className="text-lg font-black text-white mt-0.5">3,780</p>
-              </div>
+              <button
+                onClick={load}
+                className="px-3.5 py-2 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold"
+              >
+                Retry Connection
+              </button>
             </div>
+          )}
 
-            <div className="glass-panel p-5 rounded-xl border-white/5 flex gap-3 items-center">
-              <div className="h-9 w-9 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-400 border border-teal-500/20">
-                <TrendingUp className="h-5 w-5" />
-              </div>
-              <div>
-                <h4 className="text-sm text-slate-400">Avg Resolution</h4>
-                <p className="text-lg font-black text-white mt-0.5">14.8 Hrs</p>
-              </div>
-            </div>
-
-            <div className="glass-panel p-5 rounded-xl border-white/5 flex gap-3 items-center">
-              <div className="h-9 w-9 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-450 text-rose-400 border border-rose-500/20">
-                <ShieldAlert className="h-5 w-5" />
-              </div>
-              <div>
-                <h4 className="text-sm text-slate-400">Anomaly Detections</h4>
-                <p className="text-lg font-black text-white mt-0.5">248</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-panel rounded-2xl border-white/5 overflow-hidden">
-            <div className="p-5 border-b border-white/5 flex justify-between items-center bg-slate-900/30">
-              <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Award className="h-4.5 w-4.5 text-blue-400" />
-                Inter-Municipal Ward Standings
-              </span>
-              <span className="text-[10px] text-slate-500">Daily Update cycle</span>
-            </div>
-
-            <div className="divide-y divide-white/5 text-xs">
-              <div className="p-4 grid grid-cols-12 gap-2 text-slate-500 font-bold bg-slate-950/40">
-                <div className="col-span-1">Rank</div>
-                <div className="col-span-4 text-left">Ward Details</div>
-                <div className="col-span-3 text-center">Resolution Target</div>
-                <div className="col-span-2 text-center">AI Trust Score</div>
-                <div className="col-span-2 text-right">Closed</div>
-              </div>
-
-              {leaderboard.map((row, idx) => (
-                <div key={idx} className="p-4 grid grid-cols-12 gap-2 text-slate-200 hover:bg-white/[0.01] transition-colors items-center">
-                  <div className="col-span-1 font-extrabold text-blue-400">{row.rank}</div>
-                  <div className="col-span-4 text-left font-bold text-white">{row.ward}</div>
-                  <div className="col-span-3 text-center">{row.response}</div>
-                  <div className="col-span-2 text-center text-teal-400 font-bold">{row.trust}</div>
-                  <div className="col-span-2 text-right font-medium text-slate-400">{row.resolved}</div>
+          {!dbUnavailable && complaints && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="glass-panel p-5 rounded-xl border-white/5 flex gap-3 items-center">
+                <div className="h-9 w-9 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
+                  <Layers className="h-5 w-5" />
                 </div>
-              ))}
+                <div>
+                  <h4 className="text-sm text-slate-400">Total Grievances</h4>
+                  <p className="text-lg font-black text-white mt-0.5">{complaints.total}</p>
+                </div>
+              </div>
+
+              <div className="glass-panel p-5 rounded-xl border-white/5 flex gap-3 items-center">
+                <div className="h-9 w-9 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 border border-indigo-500/20">
+                  <CheckCircle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm text-slate-400">Resolved &amp; Closed</h4>
+                  <p className="text-lg font-black text-white mt-0.5">{complaints.resolved}</p>
+                </div>
+              </div>
+
+              <div className="glass-panel p-5 rounded-xl border-white/5 flex gap-3 items-center">
+                <div className="h-9 w-9 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-400 border border-rose-500/20">
+                  <ShieldAlert className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm text-slate-400">In TPA Review</h4>
+                  <p className="text-lg font-black text-white mt-0.5">{complaints.tpaReview}</p>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Status pipeline */}
+          {!dbUnavailable && complaints && (
+            <div className="glass-panel rounded-2xl border-white/5 overflow-hidden">
+              <div className="p-5 border-b border-white/5 flex justify-between items-center bg-slate-900/30">
+                <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <TrendingUp className="h-4 w-4 text-blue-400" />
+                  Grievance Lifecycle Distribution
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  Updated {new Date(data!.generatedAt).toLocaleTimeString()}
+                </span>
+              </div>
+
+              <div className="divide-y divide-white/5 text-xs">
+                {[
+                  { label: "Submitted (awaiting verification routing)", value: complaints.submitted },
+                  { label: "Assigned to field officers", value: complaints.assigned },
+                  { label: "In progress (field work underway)", value: complaints.inProgress },
+                  { label: "Resolved / closed after confirmation", value: complaints.resolved },
+                  { label: "Routed to third-party audit", value: complaints.tpaReview }
+                ].map((row) => (
+                  <div key={row.label} className="p-4 flex items-center justify-between text-slate-300">
+                    <span>{row.label}</span>
+                    <span className="font-mono font-black text-white">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Category breakdown */}
+          {!dbUnavailable && (
+            <div className="glass-panel rounded-2xl border-white/5 overflow-hidden">
+              <div className="p-5 border-b border-white/5 flex justify-between items-center bg-slate-900/30">
+                <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                  <Award className="h-4 w-4 text-blue-400" />
+                  Grievances by Category
+                </span>
+              </div>
+              {categories.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400">
+                  No grievances recorded yet. Categories will appear as citizens file verified reports.
+                </div>
+              ) : (
+                <div className="divide-y divide-white/5 text-xs">
+                  {categories.map((row) => (
+                    <div key={row.category} className="p-4 flex items-center justify-between text-slate-300">
+                      <span>{row.category}</span>
+                      <span className="font-mono font-black text-white">{row.count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
         </div>
 
         <div className="lg:col-span-5 space-y-6 text-left">
 
-          <div className="glass-panel p-6 rounded-2xl border-white/5 space-y-4">
-            <div className="border-b border-white/5 pb-3">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">Predictive Infrastructure Heatmap</h3>
-              <p className="text-[10px] text-slate-500 mt-1">Thermographical representation of active structural decays (potholes, pipeline bursts)</p>
-            </div>
-
-            <div className="flex justify-center bg-slate-950/40 border border-white/5 rounded-xl p-4">
-              <canvas ref={canvasRef} width={320} height={280} className="max-w-full" />
-            </div>
-
-            <div className="space-y-2.5 text-[10px] text-slate-450 text-slate-400 leading-relaxed">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-rose-500 animate-pulse" />
-                <span><strong className="text-white">Red hotspots:</strong> High severity/frequency failure zones (&gt; 3 incidents)</span>
+          {!dbUnavailable && verification && (
+            <div className="glass-panel p-6 rounded-2xl border-white/5 space-y-4">
+              <div className="border-b border-white/5 pb-3">
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">Evidence Verification Integrity</h3>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Aggregate output of the 13-stage verification engine across all submissions.
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
-                <span><strong className="text-white">Amber hotspots:</strong> Standard warning zones (recent reports under evaluation)</span>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-xl bg-slate-900/50 border border-white/5">
+                  <span className="text-[9px] font-mono uppercase text-slate-500 block">Evidence Audited</span>
+                  <span className="text-lg font-black font-mono text-white">{verification.evidenceAudited}</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-slate-900/50 border border-white/5">
+                  <span className="text-[9px] font-mono uppercase text-slate-500 block">Avg Trust Score</span>
+                  <span className="text-lg font-black font-mono text-indigo-400">{verification.avgTrustScore}</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-slate-900/50 border border-white/5">
+                  <span className="text-[9px] font-mono uppercase text-slate-500 block">Duplicates Flagged</span>
+                  <span className="text-lg font-black font-mono text-amber-400">{verification.duplicatesFlagged}</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-slate-900/50 border border-white/5">
+                  <span className="text-[9px] font-mono uppercase text-slate-500 block">Manipulation Signals</span>
+                  <span className="text-lg font-black font-mono text-rose-400">{verification.manipulationFlagged}</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="glass-panel p-6 rounded-2xl border-white/5 space-y-3">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Why Trust CivicTrust?</h4>
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider">How Verification Works</h4>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Every complaint is certified by independent cryptographic checks. Photos require unaltered EXIF parameters matching the exact geographic coordinates, eliminating duplicate or malicious reports and ensuring public funding resolves real structural problems.
+              Each submission passes through a 13-stage pipeline: file validation, image quality checks,
+              EXIF metadata extraction, error-level analysis, GPS verification, GHMC boundary geofencing,
+              timestamp consistency, OCR, object detection, duplicate detection (SHA-256 and perceptual
+              hashing), context correlation, an evidence-based trust score, and an explainable report.
+            </p>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              AI assists the assessment; it is not the authority. Manipulation signals are treated as
+              indicators for human audit — never as automatic proof of fraud. Critical workflow decisions
+              are governed by deterministic rules.
             </p>
           </div>
+
+          {loading && (
+            <div className="p-6 text-center text-xs text-slate-500 font-mono">Loading live ledger statistics…</div>
+          )}
 
         </div>
 

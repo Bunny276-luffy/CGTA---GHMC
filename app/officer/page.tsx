@@ -2,27 +2,26 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { t, SupportedLanguage } from "@/lib/i18n";
 import {
   ShieldCheck,
   CheckCircle,
   Navigation,
   UploadCloud,
   AlertTriangle,
-  FileCheck,
   LogOut,
-  Sun,
-  Moon,
   Clock,
   MapPin,
   Camera,
-  Layers,
-  ArrowRight,
   RefreshCw,
-  AlertCircle,
-  ExternalLink,
-  ChevronRight,
-  Search
+  Search,
+  Globe,
+  Check,
+  Info,
+  ChevronRight
 } from "lucide-react";
+import { fetchSessionUser, logoutAndRedirect, StoredUser } from "../../lib/client-auth";
+import { compressImage } from "../../lib/image-utils";
 
 interface Ticket {
   id: string;
@@ -30,7 +29,7 @@ interface Ticket {
   title: string;
   description: string;
   category: string;
-  status: "ASSIGNED" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+  status: "SUBMITTED" | "ASSIGNED" | "IN_PROGRESS" | "RESOLVED" | "TPA_REVIEW" | "CLOSED";
   severity: "EMERGENCY" | "HIGH" | "STANDARD";
   address: string;
   latitude: number;
@@ -43,17 +42,17 @@ interface Ticket {
 
 export default function OfficerDashboard() {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [currentUser, setCurrentUser] = useState<StoredUser | null>(null);
+  const [lang, setLang] = useState<SupportedLanguage>("en");
   const [filter, setFilter] = useState<"ALL" | "EMERGENCY" | "IN_PROGRESS" | "RESOLVED">("ALL");
   const [searchTerm, setSearchTerm] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  // Real operational ticket state (no fake initial hardcoded complaints)
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Field Resolution Work State
+  // Resolution work state
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [fieldNotes, setFieldNotes] = useState("");
@@ -67,33 +66,26 @@ export default function OfficerDashboard() {
 
   useEffect(() => {
     setMounted(true);
-    let parsed;
-    try {
-      const userStr = localStorage.getItem("user");
-      if (!userStr) {
-        router.push("/login");
-        return;
-      }
-      parsed = JSON.parse(userStr);
-      if (!parsed || parsed.role !== "OFFICER") {
-        router.push("/login");
-        return;
-      }
-      setCurrentUser(parsed);
-    } catch (e) {
-      router.push("/login");
-      return;
-    }
 
-    // Fetch real assigned tickets from API
-    const fetchOfficerTickets = async () => {
+    const bootstrap = async () => {
+      const user = await fetchSessionUser(["OFFICER"]);
+      if (!user) {
+        router.push("/officer/login");
+        return;
+      }
+      setCurrentUser(user);
+
       try {
-        const res = await fetch(`/api/complaints/track?userId=${parsed.id}`);
+        const res = await fetch("/api/complaints", { credentials: "same-origin" });
+        if (res.status === 401) {
+          router.push("/officer/login");
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
+          if (Array.isArray(data)) {
             setTickets(data);
-            setSelectedTicket(data[0]);
+            if (data.length > 0) setSelectedTicket(data[0]);
           }
         }
       } catch (err) {
@@ -103,9 +95,8 @@ export default function OfficerDashboard() {
       }
     };
 
-    fetchOfficerTickets();
+    bootstrap();
 
-    // Get field officer live GPS
     if (typeof window !== "undefined" && "geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -120,22 +111,41 @@ export default function OfficerDashboard() {
     }
   }, [router]);
 
-  useEffect(() => {
-    const root = window.document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-      root.classList.remove("light");
-    } else {
-      root.classList.add("light");
-      root.classList.remove("dark");
-    }
-  }, [theme]);
+  const applyStatusChange = async (
+    ticketId: string,
+    status: string,
+    extras: Record<string, unknown> = {}
+  ): Promise<any | null> => {
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/complaints/${ticketId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ status, ...extras })
+      });
 
-  const toggleTheme = () => {
-    setTheme(prev => prev === "light" ? "dark" : "light");
+      const data = await res.json();
+      if (res.status === 401) {
+        router.push("/officer/login");
+        return null;
+      }
+      if (!res.ok) {
+        throw new Error(data.message || "Status update rejected by the server");
+      }
+      return data;
+    } catch (err: any) {
+      setActionError(err?.message ? `Action failed: ${err.message}` : "Action failed. Please try again.");
+      return null;
+    }
   };
 
-  const handleStartWork = (ticketId: string) => {
+  const handleStartWork = async (ticketId: string) => {
+    const result = await applyStatusChange(ticketId, "IN_PROGRESS", {
+      notes: "Officer acknowledged assignment and started onsite work"
+    });
+    if (!result) return;
+
     setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: "IN_PROGRESS" } : t));
     if (selectedTicket && selectedTicket.id === ticketId) {
       setSelectedTicket(prev => prev ? { ...prev, status: "IN_PROGRESS" } : null);
@@ -146,16 +156,30 @@ export default function OfficerDashboard() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 8 * 1024 * 1024) {
+      setAuditError("Resolution photo exceeds the 8 MB limit.");
+      return;
+    }
+
+    if (photoPreview && photoPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(photoPreview);
+    }
+
     setPhoto(file);
     setPhotoPreview(URL.createObjectURL(file));
     setAuditError(null);
     setVerifiedSuccess(false);
   };
 
+
   const handleVerifyAndResolve = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!photo || !selectedTicket) {
-      setAuditError("Error: Photographic resolution proof is required.");
+      setAuditError("Photographic resolution proof is required.");
+      return;
+    }
+    if (!fieldNotes || fieldNotes.trim().length < 5) {
+      setAuditError("A field action note is required.");
       return;
     }
 
@@ -163,415 +187,324 @@ export default function OfficerDashboard() {
     setAuditError(null);
     setAuditLogs(["Capturing field hardware metadata...", "Calculating on-site GPS proximity delta..."]);
 
-    setTimeout(() => {
-      // Proximity check
-      const distanceMeters = 18.5; // verified distance within tolerance
-      const logs = [
-        `Resolution file: ${photo.name} (${Math.round(photo.size / 1024)} KB)`,
-        `Field GPS Location: ${officerLat || 17.385}° N, ${officerLng || 78.4867}° E`,
-        `Target Site Location: ${selectedTicket.latitude || 17.385}° N, ${selectedTicket.longitude || 78.4867}° E`,
-        `Geofence Delta: ${distanceMeters} meters (TOLERANCE: 100m - PASS)`,
-        "EXIF Hardware Sensor Signature: Authenticated",
-        "AI Pixel Diff vs Initial Complaint: PASS (Remediation confirmed)"
-      ];
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64Data = await compressImage(reader.result as string);
+        const result = await applyStatusChange(selectedTicket.id, "RESOLVED", {
+          resolutionPhotoUrl: base64Data,
+          officerLat,
+          officerLng,
+          notes: fieldNotes
+        });
 
-      setAuditLogs(logs);
-      setVerifiedSuccess(true);
-      setUploading(false);
+        if (!result) {
+          setAuditLogs([]);
+          setUploading(false);
+          return;
+        }
 
-      // Update local ticket
-      setTickets(prev => prev.map(t =>
-        t.id === selectedTicket.id
-          ? { ...t, status: "RESOLVED", resolutionPhotoUrl: photoPreview || undefined }
-          : t
-      ));
-      setSelectedTicket(prev => prev ? { ...prev, status: "RESOLVED", resolutionPhotoUrl: photoPreview || undefined } : null);
-    }, 1200);
-  };
+        const logs = [
+          `Resolution file: ${photo.name} (${Math.round(photo.size / 1024)} KB)`,
+          `Field GPS: ${officerLat ?? "unavailable"}° N, ${officerLng ?? "unavailable"}° E`,
+          `Complaint site: ${selectedTicket.latitude}° N, ${selectedTicket.longitude}° E`,
+          result.geofence
+            ? `Geofence check: ${result.geofence.distanceMeters} m from site — ${result.geofence.withinTolerance ? "WITHIN TOLERANCE" : "OUTSIDE TOLERANCE"}`
+            : "Geofence check: verified",
+          `Status updated: ${result.complaint?.trackingId || selectedTicket.trackingId} → ${result.complaint?.status || "RESOLVED"}`
+        ];
 
-  const handleEscalateTicket = (ticketId: string) => {
-    setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: "ASSIGNED" } : t));
-    alert(`Ticket ${ticketId} escalated to Senior Municipal Engineer.`);
+        setAuditLogs(logs);
+        setVerifiedSuccess(Boolean(result.geofence?.withinTolerance !== false));
+        setUploading(false);
+
+        setTickets(prev => prev.map(t =>
+          t.id === selectedTicket.id
+            ? { ...t, status: result.complaint?.status || "RESOLVED", resolutionPhotoUrl: photoPreview || undefined }
+            : t
+        ));
+        setSelectedTicket(prev => prev ? { ...prev, status: result.complaint?.status || "RESOLVED", resolutionPhotoUrl: photoPreview || undefined } : null);
+      } catch (err: any) {
+        setAuditError(err?.message || "Could not read the resolution photo.");
+        setAuditLogs([]);
+        setUploading(false);
+      }
+    };
+    reader.readAsDataURL(photo);
   };
 
   const logout = () => {
-    localStorage.clear();
-    router.push("/login");
+    logoutAndRedirect(router, "/officer/login");
   };
 
-  const filteredTickets = tickets.filter(t => {
-    const matchesFilter = filter === "ALL" ||
-                          (filter === "EMERGENCY" && t.severity === "EMERGENCY") ||
-                          (filter === "IN_PROGRESS" && t.status === "IN_PROGRESS") ||
-                          (filter === "RESOLVED" && (t.status === "RESOLVED" || t.status === "CLOSED"));
-    const matchesSearch = t.trackingId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          t.category.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  const SEVERITY_RANK: Record<string, number> = { EMERGENCY: 0, HIGH: 1, STANDARD: 2 };
+  const filteredTickets = tickets
+    .filter(t => {
+      const matchesFilter = filter === "ALL" ||
+                            (filter === "EMERGENCY" && t.severity === "EMERGENCY") ||
+                            (filter === "IN_PROGRESS" && t.status === "IN_PROGRESS") ||
+                            (filter === "RESOLVED" && (t.status === "RESOLVED" || t.status === "CLOSED"));
+      const matchesSearch = t.trackingId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            t.category.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesFilter && matchesSearch;
+    })
+    .sort((a, b) => (SEVERITY_RANK[a.severity] ?? 2) - (SEVERITY_RANK[b.severity] ?? 2));
 
-  if (!mounted || !currentUser) {
+  if (!mounted || loading) {
     return (
-      <div className="min-h-screen bg-[#030308] flex items-center justify-center p-8 text-emerald-400 font-bold font-mono text-center">
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 text-slate-900 font-bold text-center">
         <div className="flex items-center gap-3">
-          <div className="h-5 w-5 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" />
-          <span>Authenticating Field Officer Badge...</span>
+          <div className="h-5 w-5 rounded-full border-2 border-blue-700 border-t-transparent animate-spin" />
+          <span>Opening Field Officer Desk...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 flex flex-col ${
-      theme === "dark" ? "bg-[#030308] text-slate-100" : "bg-[#f8fafc] text-slate-900"
-    }`}>
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
 
-      {/* Officer Top Operations Bar */}
-      <header className={`sticky top-0 z-30 border-b px-4 sm:px-6 py-3 flex items-center justify-between gap-3 ${
-        theme === "dark" ? "bg-[#06060f]/95 backdrop-blur-md border-emerald-500/20" : "bg-white border-slate-200 shadow-sm"
-      }`}>
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+      {/* Header */}
+      <header className="sticky top-0 z-30 bg-slate-900 text-white px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-3 shadow-md">
+        <div className="flex items-center gap-2.5">
+          <div className="h-9 w-9 bg-blue-700 rounded-lg flex items-center justify-center font-bold text-white shadow-sm">
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className={`text-sm font-black tracking-wider ${theme === "dark" ? "text-white" : "text-slate-900"}`}>
-                FIELD<span className="text-emerald-400">COMMAND</span>
-              </span>
-              <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                OFFICER ACTIVE
-              </span>
-            </div>
-            <p className="text-[10px] font-mono text-slate-400">GHMC Sector Operations • Badge #{currentUser.id?.substring(0, 8) || "GHMC-402"}</p>
+            <span className="text-base font-bold tracking-tight block leading-tight">{t("officer.title", lang)}</span>
+            <span className="text-[11px] text-slate-400 block font-normal">{currentUser?.name || "Field Officer"} ({(currentUser as any)?.department || "Operations"})</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/30 border border-white/10 text-[11px] font-mono text-slate-300">
-            <Navigation className="h-3.5 w-3.5 text-emerald-400" />
-            <span>{officerLat ? `${officerLat}° N, ${officerLng}° E` : "Acquiring GPS..."}</span>
+          {/* Language Selector */}
+          <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700 text-xs">
+            <Globe className="h-3.5 w-3.5 text-slate-400 ml-1" />
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as SupportedLanguage)}
+              className="bg-transparent text-white text-xs font-semibold outline-none cursor-pointer py-1 pr-1"
+            >
+              <option value="en" className="bg-slate-900 text-white">English</option>
+              <option value="hi" className="bg-slate-900 text-white">हिंदी</option>
+              <option value="te" className="bg-slate-900 text-white">తెలుగు</option>
+            </select>
           </div>
 
           <button
-            onClick={toggleTheme}
-            className="p-2 rounded-xl border border-slate-200 dark:border-white/10 text-slate-400 hover:text-white"
-            aria-label="Toggle Theme"
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-
-          <button
             onClick={logout}
-            className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20"
-            title="Logout"
+            className="p-2 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 font-bold text-xs flex items-center gap-1 min-h-[44px]"
+            title={t("nav.logout", lang)}
           >
             <LogOut className="h-4 w-4" />
           </button>
         </div>
       </header>
 
-      {/* Main Operational Container */}
-      <main className="flex-1 p-4 sm:p-6 max-w-6xl mx-auto w-full space-y-6">
+      {/* Main Container */}
+      <main className="flex-1 px-4 py-5 max-w-5xl mx-auto w-full pb-20">
 
-        {/* Quick Filter Chips (Touch Friendly >= 48px target) */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <button
-            onClick={() => setFilter("ALL")}
-            className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap border ${
-              filter === "ALL"
-                ? "bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/20"
-                : theme === "dark" ? "bg-slate-900 border-white/5 text-slate-400" : "bg-white border-slate-200 text-slate-700"
-            }`}
-          >
-            <span>All Tasks</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-black/30 text-[10px] font-mono">{tickets.length}</span>
-          </button>
+        {actionError && (
+          <div className="mb-4 p-3.5 rounded-lg bg-rose-50 border border-rose-300 flex items-center gap-2 text-xs text-rose-900 font-bold">
+            <AlertTriangle className="h-4 w-4 text-rose-700 flex-shrink-0" />
+            <span>{actionError}</span>
+          </div>
+        )}
 
-          <button
-            onClick={() => setFilter("EMERGENCY")}
-            className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap border ${
-              filter === "EMERGENCY"
-                ? "bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-600/20"
-                : theme === "dark" ? "bg-slate-900 border-white/5 text-slate-400" : "bg-white border-slate-200 text-slate-700"
-            }`}
-          >
-            <AlertTriangle className="h-3.5 w-3.5" />
-            <span>Emergency</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-black/30 text-[10px] font-mono">
-              {tickets.filter(t => t.severity === "EMERGENCY").length}
-            </span>
-          </button>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-          <button
-            onClick={() => setFilter("IN_PROGRESS")}
-            className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap border ${
-              filter === "IN_PROGRESS"
-                ? "bg-amber-600 text-white border-amber-500 shadow-md shadow-amber-600/20"
-                : theme === "dark" ? "bg-slate-900 border-white/5 text-slate-400" : "bg-white border-slate-200 text-slate-700"
-            }`}
-          >
-            <Clock className="h-3.5 w-3.5" />
-            <span>In Progress</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-black/30 text-[10px] font-mono">
-              {tickets.filter(t => t.status === "IN_PROGRESS").length}
-            </span>
-          </button>
+          {/* Left Column: Assigned Task Queue */}
+          <div className="lg:col-span-5 space-y-4">
 
-          <button
-            onClick={() => setFilter("RESOLVED")}
-            className={`min-h-[44px] px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap border ${
-              filter === "RESOLVED"
-                ? "bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-600/20"
-                : theme === "dark" ? "bg-slate-900 border-white/5 text-slate-400" : "bg-white border-slate-200 text-slate-700"
-            }`}
-          >
-            <CheckCircle className="h-3.5 w-3.5" />
-            <span>Resolved</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-black/30 text-[10px] font-mono">
-              {tickets.filter(t => t.status === "RESOLVED" || t.status === "CLOSED").length}
-            </span>
-          </button>
-        </div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-bold text-slate-900">{t("officer.tasks", lang)} ({filteredTickets.length})</h2>
+              <div className="flex gap-1">
+                {(["ALL", "EMERGENCY", "IN_PROGRESS", "RESOLVED"] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    className={`px-2.5 py-1.5 rounded-md text-[11px] font-bold uppercase transition-all min-h-[36px] ${
+                      filter === f ? "bg-blue-700 text-white" : "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                    }`}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {/* Master Details Split View */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-          {/* Left Column: Assigned Tickets Queue */}
-          <div className="lg:col-span-5 space-y-3">
+            {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" />
               <input
                 type="text"
-                placeholder="Search ticket tracking ID or location..."
+                placeholder="Filter by ID, headline, category..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-xs outline-none focus:border-emerald-500 transition-all ${
-                  theme === "dark" ? "bg-slate-900/80 border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
-                }`}
+                className="w-full min-h-[46px] pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 bg-white text-slate-900 text-xs font-medium outline-none focus:border-blue-700"
               />
             </div>
 
+            {/* Task List */}
             {filteredTickets.length === 0 ? (
-              <div className={`p-8 rounded-2xl border text-center space-y-2 ${
-                theme === "dark" ? "bg-slate-950/30 border-white/5" : "bg-white border-slate-200"
-              }`}>
-                <FileCheck className="h-10 w-10 text-slate-500 mx-auto" />
-                <h4 className="text-sm font-bold text-slate-300">No Assigned Tasks</h4>
-                <p className="text-xs text-slate-400">
-                  {searchTerm ? "No tickets match your search." : "Your field inspection queue is currently clear."}
-                </p>
+              <div className="p-8 rounded-xl bg-white border border-slate-300 text-center text-slate-600 text-xs font-medium">
+                No assigned tasks match your filter.
               </div>
             ) : (
-              filteredTickets.map((ticket) => (
-                <div
-                  key={ticket.id}
-                  onClick={() => setSelectedTicket(ticket)}
-                  className={`p-4 sm:p-5 rounded-2xl border text-left cursor-pointer transition-all hover:scale-[1.005] ${
-                    selectedTicket?.id === ticket.id
-                      ? "bg-emerald-500/10 border-emerald-500/30 shadow-md shadow-emerald-500/10"
-                      : theme === "dark"
-                      ? "bg-slate-950/40 border-white/5 hover:border-emerald-500/20"
-                      : "bg-white border-slate-200 hover:border-slate-300 shadow-sm"
-                  }`}
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-[10px] font-mono text-emerald-400 font-bold">{ticket.trackingId}</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className={`px-2 py-0.5 rounded text-[8px] font-bold ${
-                        ticket.severity === "EMERGENCY"
-                          ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                          : ticket.severity === "HIGH"
-                          ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                          : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
+              <div className="space-y-2.5">
+                {filteredTickets.map(t => (
+                  <div
+                    key={t.id}
+                    onClick={() => setSelectedTicket(t)}
+                    className={`p-4 rounded-xl border text-left cursor-pointer transition-all shadow-sm ${
+                      selectedTicket?.id === t.id
+                        ? "bg-blue-50 border-blue-700 ring-1 ring-blue-700"
+                        : "bg-white border-slate-300 hover:border-slate-400"
+                    }`}
+                  >
+                    <div className="flex justify-between items-center mb-1.5">
+                      <span className="text-xs font-mono font-bold text-blue-900">{t.trackingId}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        t.severity === "EMERGENCY" ? "bg-rose-100 text-rose-800 border border-rose-300" :
+                        t.severity === "HIGH" ? "bg-amber-100 text-amber-800 border border-amber-300" :
+                        "bg-slate-100 text-slate-800 border border-slate-300"
                       }`}>
-                        {ticket.severity}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded text-[8px] font-bold ${
-                        ticket.status === "RESOLVED" || ticket.status === "CLOSED"
-                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                          : ticket.status === "IN_PROGRESS"
-                          ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                          : "bg-slate-800 text-slate-300 border border-white/5"
-                      }`}>
-                        {ticket.status}
+                        [{t.severity}]
                       </span>
                     </div>
-                  </div>
 
-                  <h4 className={`text-sm font-bold leading-snug ${theme === "dark" ? "text-white" : "text-slate-800"}`}>{ticket.title}</h4>
-                  <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-                    <MapPin className="h-3 w-3 text-slate-500 flex-shrink-0" />
-                    <span className="truncate">{ticket.address}</span>
-                  </p>
-                </div>
-              ))
+                    <h4 className="text-sm font-bold text-slate-900">{t.title}</h4>
+                    <p className="text-xs text-slate-600 flex items-center gap-1 mt-1 truncate">
+                      <MapPin className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
+                      <span>{t.address}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
             )}
+
           </div>
 
-          {/* Right Column: Selected Ticket Resolution Workspace */}
+          {/* Right Column: Case Action & Resolution Workspace */}
           <div className="lg:col-span-7">
             {selectedTicket ? (
-              <div className={`p-5 sm:p-6 rounded-2xl border text-left space-y-5 ${
-                theme === "dark" ? "bg-slate-950/40 border-white/5" : "bg-white border-slate-200 shadow-sm"
-              }`}>
+              <div className="p-5 rounded-xl bg-white border border-slate-300 space-y-5 shadow-sm">
 
-                {/* Header & Meta */}
-                <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-white/5">
+                {/* Case Details Header */}
+                <div className="border-b pb-3 border-slate-200 flex justify-between items-start gap-2">
                   <div>
-                    <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase block">Active Investigation</span>
-                    <h3 className={`text-base font-bold ${theme === "dark" ? "text-white" : "text-slate-900"}`}>{selectedTicket.title}</h3>
+                    <span className="text-xs font-mono font-bold text-blue-900 block">{selectedTicket.trackingId}</span>
+                    <h3 className="text-base font-bold text-slate-900">{selectedTicket.title}</h3>
                   </div>
-                  <span className="text-xs font-mono text-slate-400">{selectedTicket.trackingId}</span>
+                  <span className="px-2.5 py-1 rounded bg-slate-100 border border-slate-300 text-xs font-bold text-slate-800">
+                    Status: {selectedTicket.status}
+                  </span>
                 </div>
 
-                {/* Citizen Evidence Display */}
-                <div className="space-y-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Citizen Evidence</span>
-                  <div className="p-3 rounded-xl bg-black/20 border border-white/5 space-y-2">
-                    <p className="text-xs text-slate-300 leading-relaxed">{selectedTicket.description}</p>
-                    {selectedTicket.beforePhotoUrl && (
-                      <img
-                        src={selectedTicket.beforePhotoUrl}
-                        alt="Citizen Upload"
-                        className="max-h-48 rounded-lg object-contain bg-black/40 border border-white/5"
-                      />
-                    )}
-                    <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
-                      <MapPin className="h-3.5 w-3.5 text-emerald-400" />
-                      <span>{selectedTicket.address} ({selectedTicket.latitude}° N, {selectedTicket.longitude}° E)</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quick Status Workflow Action */}
-                {selectedTicket.status === "ASSIGNED" && (
-                  <button
-                    onClick={() => handleStartWork(selectedTicket.id)}
-                    className="w-full min-h-[48px] py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
-                  >
-                    <Clock className="h-4 w-4" />
-                    <span>Acknowledge & Start Onsite Work</span>
-                  </button>
-                )}
-
-                {/* Field Resolution Form */}
-                <form onSubmit={handleVerifyAndResolve} className="space-y-4 pt-2 border-t border-slate-200 dark:border-white/5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">Field Resolution Verification</span>
-                    <span className="text-[10px] font-mono text-emerald-400 font-bold">100m Geofence Enforced</span>
+                <div className="space-y-3 text-xs">
+                  <p className="text-slate-700 leading-relaxed font-medium">{selectedTicket.description}</p>
+                  <div className="p-3 rounded-lg bg-slate-100 border border-slate-200 space-y-1 font-medium text-slate-800">
+                    <div>Category: <strong>{selectedTicket.category}</strong></div>
+                    <div>Location: <strong>{selectedTicket.address} ({selectedTicket.latitude}° N, {selectedTicket.longitude}° E)</strong></div>
                   </div>
 
-                  {/* Resolution Camera Upload */}
-                  <label className={`block border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all ${
-                    photoPreview
-                      ? "border-emerald-500/40 bg-emerald-500/5"
-                      : theme === "dark"
-                      ? "border-white/10 hover:border-emerald-500/40 bg-slate-900/40"
-                      : "border-slate-300 hover:border-emerald-500/40 bg-slate-50"
-                  }`}>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handlePhotoSelect}
-                      className="hidden"
-                    />
-                    {photoPreview ? (
-                      <div className="space-y-2">
-                        <img
-                          src={photoPreview}
-                          alt="Resolution Proof"
-                          className="max-h-44 mx-auto rounded-lg object-contain"
-                        />
-                        <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-400 font-bold">
-                          <CheckCircle className="h-3.5 w-3.5" />
-                          <span>Proof Attached ({photo?.name})</span>
-                        </div>
-                        <span className="text-[10px] text-slate-400 underline block">Click to retake resolution photo</span>
-                      </div>
-                    ) : (
-                      <div className="space-y-2 py-2">
-                        <Camera className="h-7 w-7 text-emerald-400 mx-auto" />
-                        <p className="text-xs font-bold text-slate-200">Capture Resolution Photo Evidence</p>
-                        <span className="inline-block px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-[11px] font-bold">
-                          Launch Field Camera
-                        </span>
-                      </div>
-                    )}
-                  </label>
-
-                  {/* Inspection Notes */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Field Action Notes</label>
-                    <textarea
-                      rows={2}
-                      placeholder="e.g. Completed asphalt patching and leveled trench at meter 104."
-                      value={fieldNotes}
-                      onChange={(e) => setFieldNotes(e.target.value)}
-                      className={`w-full px-3 py-2 rounded-xl border text-xs outline-none focus:border-emerald-500 transition-all ${
-                        theme === "dark" ? "bg-slate-900 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900"
-                      }`}
-                    />
-                  </div>
-
-                  {/* Error & Audit Logs */}
-                  {auditError && (
-                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                      <span>{auditError}</span>
+                  {selectedTicket.beforePhotoUrl && (
+                    <div>
+                      <span className="text-xs font-bold text-slate-700 block mb-1">Citizen Evidence Photo:</span>
+                      <img src={selectedTicket.beforePhotoUrl} alt="Citizen Evidence" className="max-h-52 rounded-lg object-contain border border-slate-300 bg-slate-100" />
                     </div>
                   )}
 
-                  {auditLogs.length > 0 && (
-                    <div className="p-3 rounded-xl bg-black/40 border border-emerald-500/20 space-y-1 text-[10px] font-mono text-emerald-300">
-                      {auditLogs.map((log, i) => (
-                        <div key={i} className="flex items-center gap-1.5">
-                          <span className="text-slate-500">•</span>
-                          <span>{log}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  {/* Actions depending on status */}
+                  {selectedTicket.status === "ASSIGNED" || selectedTicket.status === "SUBMITTED" ? (
                     <button
-                      type="submit"
-                      disabled={uploading || selectedTicket.status === "RESOLVED" || selectedTicket.status === "CLOSED"}
-                      className="min-h-[48px] py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                      onClick={() => handleStartWork(selectedTicket.id)}
+                      className="w-full py-3.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs uppercase min-h-[48px] shadow-sm flex items-center justify-center gap-2"
                     >
-                      {uploading ? (
-                        <>
-                          <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                          <span>Verifying Geotag...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="h-4 w-4" />
-                          <span>{selectedTicket.status === "RESOLVED" ? "Resolved" : "Mark Resolved & Submit"}</span>
-                        </>
+                      <Navigation className="h-4 w-4" />
+                      <span>Start Onsite Inspection / Work</span>
+                    </button>
+                  ) : null}
+
+                  {selectedTicket.status === "IN_PROGRESS" && (
+                    <form onSubmit={handleVerifyAndResolve} className="space-y-4 pt-3 border-t border-slate-200">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">{t("officer.onsite", lang)}</h4>
+
+                      {/* Photo Capture */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">{t("officer.resolutionPhoto", lang)}</label>
+                        <label className="min-h-[52px] p-3 rounded-lg border-2 border-dashed border-blue-600 bg-blue-50/50 hover:bg-blue-50 text-center cursor-pointer flex items-center justify-center gap-2 text-blue-900 font-bold text-xs">
+                          <input type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} className="hidden" />
+                          <Camera className="h-5 w-5 text-blue-700" />
+                          <span>{photo ? photo.name : "Tap to Launch Resolution Camera"}</span>
+                        </label>
+                      </div>
+
+                      {photoPreview && (
+                        <img src={photoPreview} alt="Resolution Proof Preview" className="max-h-48 mx-auto rounded-lg object-contain border border-slate-300" />
                       )}
-                    </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleEscalateTicket(selectedTicket.id)}
-                      className="min-h-[48px] py-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-slate-300 font-bold text-xs uppercase tracking-wider transition-all"
-                    >
-                      Escalate to Head
-                    </button>
-                  </div>
+                      {/* Remediation Note */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Remediation Action Note</label>
+                        <textarea
+                          rows={2}
+                          required
+                          placeholder={t("officer.notePlaceholder", lang)}
+                          value={fieldNotes}
+                          onChange={(e) => setFieldNotes(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-lg border border-slate-400 bg-white text-slate-900 text-xs font-medium outline-none focus:border-blue-700"
+                        />
+                      </div>
 
-                </form>
+                      {auditError && (
+                        <div className="p-3 rounded-lg bg-rose-50 border border-rose-300 text-rose-900 text-xs font-bold">
+                          {auditError}
+                        </div>
+                      )}
+
+                      {/* Submit Resolution Button */}
+                      <button
+                        type="submit"
+                        disabled={uploading}
+                        className="w-full min-h-[52px] py-3.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {uploading ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            <span>Verifying Onsite Proof...</span>
+                          </>
+                        ) : (
+                          <>
+                            <UploadCloud className="h-4 w-4" />
+                            <span>{t("officer.submitResolution", lang)}</span>
+                          </>
+                        )}
+                      </button>
+
+                      {auditLogs.length > 0 && (
+                        <div className="p-3 rounded-lg bg-slate-100 border border-slate-300 space-y-1 text-[11px] font-mono text-slate-800">
+                          {auditLogs.map((log, i) => (
+                            <div key={i}>• {log}</div>
+                          ))}
+                        </div>
+                      )}
+                    </form>
+                  )}
+
+                  {(selectedTicket.status === "RESOLVED" || selectedTicket.status === "CLOSED") && (
+                    <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-bold flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-emerald-700 flex-shrink-0" />
+                      <span>Resolution proof submitted and stored on municipal ledger.</span>
+                    </div>
+                  )}
+                </div>
 
               </div>
             ) : (
-              <div className={`p-10 rounded-2xl border text-center space-y-2 ${
-                theme === "dark" ? "bg-slate-950/20 border-white/5" : "bg-white border-slate-200"
-              }`}>
-                <Layers className="h-8 w-8 text-slate-600 mx-auto mb-1" />
-                <p className="text-xs text-slate-400">Select an assigned ticket from the queue to start field resolution.</p>
+              <div className="p-8 rounded-xl bg-white border border-slate-300 text-center text-slate-600 text-xs font-medium">
+                Select an assigned grievance from the list to begin field work.
               </div>
             )}
           </div>

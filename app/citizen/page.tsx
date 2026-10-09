@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { VerificationResult } from "../../lib/verification-engine";
+import type { VerificationResult } from "@/lib/verification-engine";
+import { t, SupportedLanguage, LANGUAGE_NAMES } from "@/lib/i18n";
 import {
   ShieldCheck,
   PlusCircle,
@@ -12,25 +13,19 @@ import {
   CheckCircle,
   Clock,
   Bell,
-  Sun,
-  Moon,
   AlertCircle,
-  HelpCircle,
-  ArrowRight,
   MapPin,
   FileText,
-  Cpu,
   Search,
   Check,
-  X,
   Navigation,
-  UploadCloud,
-  ChevronRight,
   Copy,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Globe,
+  FolderPlus,
+  Info
 } from "lucide-react";
-import Link from "next/link";
 
 interface Complaint {
   id: string;
@@ -49,21 +44,21 @@ interface Complaint {
 }
 
 const CATEGORY_OPTIONS = [
-  { id: "Roads & Potholes", label: "Roads & Potholes", desc: "Damaged road, open trench" },
-  { id: "Drainage & Water Leakage", label: "Drainage & Water", desc: "Overflowing drain, pipe leak" },
-  { id: "Garbage & Waste", label: "Garbage & Sanitation", desc: "Dumped waste, uncollected bin" },
-  { id: "Street Lighting & Electrical", label: "Streetlights & Wire", desc: "Dark lamp, hanging cable" },
-  { id: "Veterinary & Stray Animal Control", label: "Stray Animals", desc: "Nuisance, health hazard" },
+  { id: "Roads & Potholes", label: "Roads & Potholes", desc: "Pothole, damaged asphalt, open manhole" },
+  { id: "Drainage & Water Leakage", label: "Drainage & Water", desc: "Overflowing drain, pipe leakage" },
+  { id: "Garbage & Waste", label: "Garbage & Sanitation", desc: "Uncollected trash, open dumping" },
+  { id: "Street Lighting & Electrical", label: "Streetlights & Wire", desc: "Broken lamp, hanging cable" },
+  { id: "Veterinary & Stray Animal Control", label: "Stray Animals", desc: "Animal nuisance, health hazard" },
 ];
 
 export default function CitizenDashboard() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"submit" | "list">("submit");
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [lang, setLang] = useState<SupportedLanguage>("en");
   const [loading, setLoading] = useState(true);
 
-  // Form Fields (Preserved on error)
+  // Form Fields (Preserved on error & local storage fallback)
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Roads & Potholes");
@@ -132,21 +127,6 @@ export default function CitizenDashboard() {
     fetchComplaints();
   }, [router]);
 
-  useEffect(() => {
-    const root = window.document.documentElement;
-    if (theme === "dark") {
-      root.classList.add("dark");
-      root.classList.remove("light");
-    } else {
-      root.classList.add("light");
-      root.classList.remove("dark");
-    }
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === "light" ? "dark" : "light");
-  };
-
   const handleFetchCurrentLocation = () => {
     if (typeof window !== "undefined" && "geolocation" in navigator) {
       setGpsLoading(true);
@@ -159,17 +139,22 @@ export default function CitizenDashboard() {
           setGpsLocked(true);
           setGpsLoading(false);
           if (!address) {
-            setAddress(`GHMC Ward Sector (${lat}° N, ${lng}° E)`);
+            setAddress(`Geolocated Site (${lat}° N, ${lng}° E)`);
           }
         },
         (err) => {
           console.warn("Geolocation lookup error:", err.message);
           setGpsLocked(true);
           setGpsLoading(false);
-          setAddress("Jubilee Hills / Central Zone, GHMC");
+          if (!address) {
+            setAddress("Jubilee Hills / Central Zone, Municipal Ward");
+          }
         },
         { timeout: 8000 }
       );
+    } else {
+      setGpsLocked(true);
+      if (!address) setAddress("Central Zone, Municipal Ward");
     }
   };
 
@@ -177,9 +162,14 @@ export default function CitizenDashboard() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (photoPreview && photoPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(photoPreview);
+    }
+
     setPhoto(file);
     setPhotoPreview(URL.createObjectURL(file));
     setForgeryAlert(null);
+
     setSubmissionError(null);
     setIsVerifying(true);
 
@@ -219,7 +209,7 @@ export default function CitizenDashboard() {
         }
 
         if (vRes.manipulationDetected) {
-          setForgeryAlert(`CRITICAL INTEGRITY WARNING: ${vRes.editingSoftwareSignature || "Image editing anomaly detected"}. Evidence will require manual audit.`);
+          setForgeryAlert("Notice: Photo contains image editor signatures. Report marked for supervisor verification.");
         } else {
           setForgeryAlert(null);
         }
@@ -251,7 +241,7 @@ export default function CitizenDashboard() {
           description,
           category,
           severity,
-          address: address || "Geolocated Site, GHMC Municipal Zone",
+          address: address || "Geolocated Site, Municipal Zone",
           latitude,
           longitude,
           beforePhotoUrl: photoPreview || "",
@@ -270,7 +260,7 @@ export default function CitizenDashboard() {
         throw new Error(data.message || "Failed to submit complaint to server");
       }
 
-      const trackingId = data.complaint?.trackingId || `CGTA-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      const trackingId = data.complaint?.trackingId || `CT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
 
       const newComplaint: Complaint = {
         id: data.complaint?.id || "comp-" + Date.now(),
@@ -280,7 +270,7 @@ export default function CitizenDashboard() {
         category,
         status: (data.complaint?.status as any) || "SUBMITTED",
         severity,
-        address: address || "Geolocated Site, GHMC Municipal Zone",
+        address: address || "Geolocated Site, Municipal Zone",
         beforePhotoUrl: photoPreview || "",
         rejectionCount: 0,
         createdAt: new Date().toISOString(),
@@ -301,8 +291,7 @@ export default function CitizenDashboard() {
 
     } catch (err: any) {
       console.warn("Local grievance creation fallback mode:", err);
-      // Preserve form data and generate local ticket to prevent user loss
-      const trackingId = `CGTA-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      const trackingId = `CT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
       const newComplaint: Complaint = {
         id: "comp-" + Date.now(),
         trackingId,
@@ -311,7 +300,7 @@ export default function CitizenDashboard() {
         category,
         status: "SUBMITTED",
         severity,
-        address: address || "Geolocated Site, GHMC Municipal Zone",
+        address: address || "Geolocated Site, Municipal Zone",
         beforePhotoUrl: photoPreview || "",
         rejectionCount: 0,
         createdAt: new Date().toISOString(),
@@ -340,7 +329,7 @@ export default function CitizenDashboard() {
           const nextStatus = nextRejections >= 2 ? "TPA_REVIEW" : "IN_PROGRESS";
 
           setNotifications(prevNotif => [
-            `Grievance ${c.trackingId} resolution disputed. Escalated to ${nextStatus === "TPA_REVIEW" ? "Third-Party Auditor (TPA)" : "Supervising Officer"}.`,
+            `Grievance ${c.trackingId} resolution disputed. Escalated to Supervisor.`,
             ...prevNotif
           ]);
 
@@ -370,6 +359,21 @@ export default function CitizenDashboard() {
     router.push("/login");
   };
 
+  const getStatusBadge = (status: Complaint["status"]) => {
+    switch (status) {
+      case "CLOSED":
+        return <span className="px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> [✓ {t("status.closed", lang)}]</span>;
+      case "RESOLVED":
+        return <span className="px-2.5 py-1 rounded-md bg-blue-100 text-blue-800 border border-blue-300 font-bold text-xs flex items-center gap-1"><Check className="h-3.5 w-3.5" /> [✓ {t("status.resolved", lang)}]</span>;
+      case "IN_PROGRESS":
+        return <span className="px-2.5 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> [● {t("status.in_progress", lang)}]</span>;
+      case "ASSIGNED":
+        return <span className="px-2.5 py-1 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold text-xs flex items-center gap-1"><Info className="h-3.5 w-3.5" /> [● {t("status.assigned", lang)}]</span>;
+      default:
+        return <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 border border-slate-300 font-bold text-xs flex items-center gap-1"><Info className="h-3.5 w-3.5" /> [● {t("status.submitted", lang)}]</span>;
+    }
+  };
+
   const filteredComplaints = complaints.filter(c => {
     const matchesSearch = c.trackingId.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           c.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -380,121 +384,132 @@ export default function CitizenDashboard() {
 
   if (!mounted || !currentUser) {
     return (
-      <div className="min-h-screen bg-[#030308] flex items-center justify-center p-8 text-indigo-400 font-bold font-mono text-center">
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 text-slate-900 font-bold text-center">
         <div className="flex items-center gap-3">
-          <div className="h-5 w-5 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" />
-          <span>Securing Mobile Citizen Session...</span>
+          <div className="h-5 w-5 rounded-full border-2 border-blue-700 border-t-transparent animate-spin" />
+          <span>Opening Citizen Portal...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 flex flex-col ${
-      theme === "dark" ? "bg-[#030308] text-slate-100" : "bg-[#f8fafc] text-slate-900"
-    }`}>
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
 
-      {/* Sticky Top Mobile Header */}
-      <header className={`sticky top-0 z-30 border-b px-4 py-3 flex items-center justify-between gap-3 ${
-        theme === "dark" ? "bg-[#06060f]/95 backdrop-blur-md border-white/10" : "bg-white border-slate-200 shadow-sm"
-      }`}>
+      {/* Header */}
+      <header className="sticky top-0 z-30 bg-slate-900 text-white px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-3 shadow-md">
         <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center rounded-xl shadow-md shadow-indigo-500/20">
-            <ShieldCheck className="h-5 w-5 text-white" />
+          <div className="h-9 w-9 bg-blue-700 rounded-lg flex items-center justify-center font-bold text-white shadow-sm">
+            <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <span className={`text-sm font-black tracking-wider ${theme === "dark" ? "text-white" : "text-slate-900"}`}>
-              CITIZEN<span className="text-indigo-400">MOBILE</span>
-            </span>
-            <p className="text-[9px] font-mono text-slate-400">GHMC Onsite Grievance Desk</p>
+            <span className="text-base font-bold tracking-tight block leading-tight">{t("citizen.title", lang)}</span>
+            <span className="text-[11px] text-slate-400 block font-normal">{t("app.municipality", lang)}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={toggleTheme}
-            className="p-2.5 rounded-xl border border-slate-200 dark:border-white/10 text-slate-400 hover:text-white transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
-            aria-label="Toggle Theme"
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
+          {/* Language Selection */}
+          <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700 text-xs">
+            <Globe className="h-3.5 w-3.5 text-slate-400 ml-1" />
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as SupportedLanguage)}
+              className="bg-transparent text-white text-xs font-semibold outline-none cursor-pointer py-1 pr-1"
+              aria-label={t("nav.language", lang)}
+            >
+              <option value="en" className="bg-slate-900 text-white">English</option>
+              <option value="hi" className="bg-slate-900 text-white">हिंदी</option>
+              <option value="te" className="bg-slate-900 text-white">తెలుగు</option>
+            </select>
+          </div>
 
           <button
             onClick={logout}
-            className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
-            title="Sign Out"
+            className="p-2 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 font-bold text-xs flex items-center gap-1 min-h-[44px]"
+            title={t("nav.logout", lang)}
           >
             <LogOut className="h-4 w-4" />
           </button>
         </div>
       </header>
 
-      {/* Main Field Workspace Container */}
-      <main className="flex-1 px-4 py-4 max-w-xl mx-auto w-full pb-28">
+      {/* Main Container */}
+      <main className="flex-1 px-4 py-5 max-w-xl mx-auto w-full pb-28">
 
         {/* Notifications Bar */}
         {notifications.length > 0 && (
           <div className="mb-4 space-y-2">
             {notifications.map((notif, idx) => (
-              <div key={idx} className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-start gap-2.5 text-xs text-indigo-300">
-                <Bell className="h-4 w-4 mt-0.5 flex-shrink-0 text-indigo-400" />
+              <div key={idx} className="p-3.5 rounded-lg bg-blue-50 border border-blue-200 flex items-start gap-2.5 text-xs text-blue-900 font-medium">
+                <Bell className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-700" />
                 <span>{notif}</span>
               </div>
             ))}
           </div>
         )}
 
-        {/* WORKFLOW TAB 1: REPORT INCIDENT */}
+        {/* Tab Selection */}
+        <div className="grid grid-cols-2 gap-2 mb-6 p-1 bg-slate-200 rounded-xl">
+          <button
+            onClick={() => { setActiveTab("submit"); setSuccessId(null); }}
+            className={`py-3 px-4 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-2 min-h-[48px] ${
+              activeTab === "submit" ? "bg-blue-700 text-white shadow-md" : "text-slate-700 hover:text-slate-900"
+            }`}
+          >
+            <PlusCircle className="h-4 w-4" />
+            <span>{t("citizen.tab.report", lang)}</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveTab("list"); setSuccessId(null); }}
+            className={`py-3 px-4 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-2 min-h-[48px] ${
+              activeTab === "list" ? "bg-blue-700 text-white shadow-md" : "text-slate-700 hover:text-slate-900"
+            }`}
+          >
+            <ListFilter className="h-4 w-4" />
+            <span>{t("citizen.tab.myGrievances", lang)} ({complaints.length})</span>
+          </button>
+        </div>
+
+        {/* TAB 1: REPORT ISSUE */}
         {activeTab === "submit" && (
-          <div className="space-y-5 text-left">
+          <div className="space-y-6">
 
-            {/* Step Header */}
-            <div>
-              <h1 className={`text-xl font-black ${theme === "dark" ? "text-white" : "text-slate-900"}`}>
-                File Geotagged Grievance
-              </h1>
-              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                Take a clear photo outdoors. The 13-stage AI engine verifies location, camera EXIF, and checks for duplicates automatically.
-              </p>
-            </div>
-
-            {/* Success Card */}
             {successId ? (
-              <div className="p-6 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-4 shadow-xl">
-                <div className="h-14 w-14 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center mx-auto text-emerald-400">
+              <div className="p-6 rounded-xl bg-emerald-50 border-2 border-emerald-600 text-center space-y-4 shadow-sm">
+                <div className="h-14 w-14 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto">
                   <CheckCircle className="h-8 w-8" />
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-lg font-black text-emerald-400">Grievance Registered</h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    Submitted to municipal ledger. Dispatched for field inspection.
-                  </p>
+                <div>
+                  <h2 className="text-lg font-bold text-emerald-900">{t("citizen.success.title", lang)}</h2>
+                  <p className="text-xs text-emerald-800 mt-1">Directly dispatched to municipal field inspection team.</p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-black/40 border border-emerald-500/20 max-w-sm mx-auto flex items-center justify-between gap-3">
+                <div className="p-4 rounded-lg bg-white border border-emerald-300 flex items-center justify-between gap-3 max-w-sm mx-auto">
                   <div className="text-left">
-                    <span className="text-[10px] font-mono uppercase text-slate-400 block font-bold">Tracking ID</span>
-                    <span className="text-base font-mono font-black text-emerald-300">{successId}</span>
+                    <span className="text-[11px] font-bold text-slate-500 uppercase block">{t("citizen.success.tracking", lang)}</span>
+                    <span className="text-base font-mono font-bold text-slate-900">{successId}</span>
                   </div>
                   <button
                     onClick={() => copyTrackingId(successId)}
-                    className="px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 transition-all flex items-center gap-1 text-xs font-bold min-h-[44px]"
+                    className="px-3.5 py-2 rounded-md bg-emerald-700 text-white font-bold text-xs min-h-[44px] flex items-center gap-1.5"
                   >
                     {copiedId ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    <span>{copiedId ? "Copied" : "Copy"}</span>
+                    <span>{copiedId ? t("citizen.copied", lang) : t("citizen.copy", lang)}</span>
                   </button>
                 </div>
 
                 <div className="space-y-2 pt-2">
                   <button
                     onClick={() => { setActiveTab("list"); setSuccessId(null); }}
-                    className="w-full min-h-[52px] py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-600/20"
+                    className="w-full py-3.5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs uppercase min-h-[48px] shadow-sm"
                   >
-                    Track Progress in My Grievances
+                    View Status in My Complaints
                   </button>
                   <button
                     onClick={() => setSuccessId(null)}
-                    className="w-full min-h-[48px] py-3 rounded-2xl bg-slate-900 border border-white/10 text-slate-300 hover:text-white font-bold text-xs uppercase tracking-wider transition-all"
+                    className="w-full py-3 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs uppercase min-h-[44px]"
                   >
                     Report Another Issue
                   </button>
@@ -503,187 +518,124 @@ export default function CitizenDashboard() {
             ) : (
               <form onSubmit={handleCreateComplaint} className="space-y-5">
 
-                {/* STEP 1: CAMERA EVIDENCE CAPTURE */}
-                <div className={`p-4 sm:p-5 rounded-2xl border text-left space-y-3.5 ${
-                  theme === "dark" ? "bg-slate-950/50 border-white/10" : "bg-white border-slate-200 shadow-sm"
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="h-6 w-6 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-mono font-bold flex items-center justify-center">1</span>
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200 dark:text-white">Photo Evidence</h3>
-                    </div>
-                    <span className="text-[10px] font-mono text-indigo-400 uppercase font-bold">Required</span>
+                {/* STEP 1: PHOTO EVIDENCE */}
+                <div className="p-4 rounded-xl bg-white border border-slate-300 space-y-3 shadow-sm">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("citizen.step1", lang)}</h3>
+                  <p className="text-xs text-slate-600">{t("citizen.step1.sub", lang)}</p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Camera Capture */}
+                    <label className="min-h-[52px] p-3 rounded-lg border-2 border-dashed border-blue-600 bg-blue-50/50 hover:bg-blue-50 text-center cursor-pointer flex items-center justify-center gap-2 text-blue-900 font-bold text-xs">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                      />
+                      <Camera className="h-5 w-5 text-blue-700" />
+                      <span>{t("citizen.camera.launch", lang)}</span>
+                    </label>
+
+                    {/* Gallery / File Fallback */}
+                    <label className="min-h-[52px] p-3 rounded-lg border-2 border-dashed border-slate-400 bg-slate-100 hover:bg-slate-200 text-center cursor-pointer flex items-center justify-center gap-2 text-slate-800 font-bold text-xs">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                      />
+                      <FolderPlus className="h-5 w-5 text-slate-600" />
+                      <span>{t("citizen.camera.gallery", lang)}</span>
+                    </label>
                   </div>
 
-                  <label className={`block border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all ${
-                    photoPreview
-                      ? "border-emerald-500/40 bg-emerald-500/5"
-                      : theme === "dark"
-                      ? "border-white/15 hover:border-indigo-500/40 bg-slate-900/40"
-                      : "border-slate-300 hover:border-indigo-500/40 bg-slate-50"
-                  }`}>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handlePhotoUpload}
-                      className="hidden"
-                    />
-                    {photoPreview ? (
-                      <div className="space-y-3">
-                        <img
-                          src={photoPreview}
-                          alt="Grievance Preview"
-                          className="max-h-52 mx-auto rounded-xl object-contain shadow-lg"
-                        />
-                        <div className="flex items-center justify-center gap-2 text-xs text-emerald-400 font-bold">
-                          <CheckCircle className="h-4 w-4" />
-                          <span>Photo Ready: {photo?.name}</span>
-                        </div>
-                        <span className="text-[11px] text-slate-400 block underline font-bold">Retake Photo / Change</span>
-                      </div>
-                    ) : (
-                      <div className="space-y-3 py-3">
-                        <div className="h-14 w-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto text-indigo-400">
-                          <Camera className="h-7 w-7" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-100 dark:text-white">Tap to Take Onsite Photo</p>
-                          <p className="text-xs text-slate-400 mt-0.5">Launches your phone camera directly</p>
-                        </div>
-                        <span className="inline-flex items-center justify-center min-h-[48px] px-6 rounded-xl bg-indigo-600 text-white text-xs font-bold uppercase tracking-wider shadow-md shadow-indigo-500/20">
-                          Launch Camera
-                        </span>
-                      </div>
-                    )}
-                  </label>
-
-                  {/* Verification Status Banner */}
-                  {isVerifying && (
-                    <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center gap-3 text-xs text-indigo-300 font-mono">
-                      <div className="h-4 w-4 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin flex-shrink-0" />
-                      <span>Running 13-Stage AI Evidence Verification...</span>
+                  {photoPreview && (
+                    <div className="p-3 rounded-lg bg-slate-100 border border-slate-300 text-center space-y-2 mt-2">
+                      <img src={photoPreview} alt="Evidence Preview" className="max-h-48 mx-auto rounded-md object-contain border border-slate-300" />
+                      <span className="text-xs font-bold text-emerald-800 flex items-center justify-center gap-1">
+                        <CheckCircle className="h-4 w-4 text-emerald-700" /> Photo attached: {photo?.name}
+                      </span>
                     </div>
                   )}
 
-                  {verificationResult && !isVerifying && (
-                    <div className="p-3.5 rounded-xl bg-indigo-500/5 border border-indigo-500/20 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <Cpu className="h-4 w-4 text-indigo-400" />
-                          <span className="text-xs font-bold text-indigo-300">AI Audit Completed</span>
-                        </div>
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-bold border ${
-                          verificationResult.trustGrade === "HIGH_TRUST"
-                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                            : verificationResult.trustGrade === "MODERATE_TRUST"
-                            ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                            : "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                        }`}>
-                          Trust: {verificationResult.trustScore}/100 ({verificationResult.trustGrade})
-                        </span>
-                      </div>
+                  {isVerifying && (
+                    <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 flex items-center gap-2.5 text-xs text-blue-900 font-semibold">
+                      <RefreshCw className="h-4 w-4 animate-spin text-blue-700 flex-shrink-0" />
+                      <span>{t("citizen.checking", lang)}</span>
                     </div>
                   )}
 
                   {forgeryAlert && (
-                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5 text-xs text-rose-400">
-                      <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-700 flex-shrink-0" />
                       <span>{forgeryAlert}</span>
                     </div>
                   )}
                 </div>
 
-                {/* STEP 2: LOCATION LOCK */}
-                <div className={`p-4 sm:p-5 rounded-2xl border text-left space-y-3.5 ${
-                  theme === "dark" ? "bg-slate-950/50 border-white/10" : "bg-white border-slate-200 shadow-sm"
-                }`}>
+                {/* STEP 2: LOCATION */}
+                <div className="p-4 rounded-xl bg-white border border-slate-300 space-y-3 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="h-6 w-6 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-mono font-bold flex items-center justify-center">2</span>
-                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200 dark:text-white">Incident Location</h3>
-                    </div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("citizen.step2", lang)}</h3>
                     <button
                       type="button"
                       onClick={handleFetchCurrentLocation}
                       disabled={gpsLoading}
-                      className="min-h-[44px] px-3 py-2 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-500/25 transition-all"
+                      className="px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-xs border border-blue-300 min-h-[44px] flex items-center gap-1.5"
                     >
-                      {gpsLoading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Navigation className="h-3.5 w-3.5 text-indigo-400" />}
-                      <span>{gpsLocked ? "GPS Locked ✓" : "Fetch Device GPS"}</span>
+                      {gpsLoading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Navigation className="h-3.5 w-3.5 text-blue-700" />}
+                      <span>{gpsLocked ? t("citizen.gps.locked", lang) : t("citizen.gps.fetch", lang)}</span>
                     </button>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Landmark / Address</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Address / Landmark</label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Metro Pillar 104, Jubilee Hills Road 36"
+                      placeholder={t("citizen.address.placeholder", lang)}
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
-                      className={`w-full min-h-[48px] px-4 py-3 rounded-xl border text-xs outline-none focus:border-indigo-500 transition-all ${
-                        theme === "dark" ? "bg-slate-900 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900"
-                      }`}
+                      className="w-full min-h-[48px] px-3.5 py-3 rounded-lg border border-slate-400 bg-white text-slate-900 text-xs font-medium outline-none focus:border-blue-700 focus:ring-1 focus:ring-blue-700"
                     />
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 bg-black/20 p-2.5 rounded-xl">
-                    <span>GPS: <strong className="text-indigo-300">{latitude}° N, {longitude}° E</strong></span>
-                    <span className="text-emerald-400 font-bold">GHMC Sector Bounds Checked</span>
                   </div>
                 </div>
 
-                {/* STEP 3: VISUAL CATEGORY SELECTION */}
-                <div className={`p-4 sm:p-5 rounded-2xl border text-left space-y-3.5 ${
-                  theme === "dark" ? "bg-slate-950/50 border-white/10" : "bg-white border-slate-200 shadow-sm"
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <span className="h-6 w-6 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-mono font-bold flex items-center justify-center">3</span>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200 dark:text-white">Category</h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* STEP 3: CATEGORY */}
+                <div className="p-4 rounded-xl bg-white border border-slate-300 space-y-3 shadow-sm">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("citizen.step3", lang)}</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {CATEGORY_OPTIONS.map((cat) => (
                       <button
                         key={cat.id}
                         type="button"
                         onClick={() => setCategory(cat.id)}
-                        className={`min-h-[56px] p-3.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+                        className={`min-h-[52px] p-3 rounded-lg border text-left flex items-center justify-between transition-all ${
                           category === cat.id
-                            ? "bg-indigo-500/20 border-indigo-500 text-white shadow-md shadow-indigo-500/10"
-                            : theme === "dark"
-                            ? "bg-slate-900/60 border-white/10 text-slate-300 hover:border-white/20"
-                            : "bg-slate-50 border-slate-200 text-slate-700"
+                            ? "bg-blue-700 text-white border-blue-800 font-bold shadow-sm"
+                            : "bg-slate-50 text-slate-800 border-slate-300 hover:bg-slate-100"
                         }`}
                       >
                         <div>
-                          <span className="text-xs font-bold block">{cat.label}</span>
-                          <span className="text-[10px] text-slate-400 block mt-0.5">{cat.desc}</span>
+                          <span className="text-xs block font-bold">{cat.label}</span>
+                          <span className={`text-[10px] block ${category === cat.id ? "text-blue-100" : "text-slate-500"}`}>{cat.desc}</span>
                         </div>
-                        {category === cat.id && <Check className="h-4 w-4 text-indigo-400 flex-shrink-0" />}
+                        {category === cat.id && <Check className="h-4 w-4 text-white flex-shrink-0" />}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* STEP 4: SEVERITY SELECTION */}
-                <div className={`p-4 sm:p-5 rounded-2xl border text-left space-y-3.5 ${
-                  theme === "dark" ? "bg-slate-950/50 border-white/10" : "bg-white border-slate-200 shadow-sm"
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <span className="h-6 w-6 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-mono font-bold flex items-center justify-center">4</span>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200 dark:text-white">Severity Level</h3>
-                  </div>
-
+                {/* STEP 4: SEVERITY */}
+                <div className="p-4 rounded-xl bg-white border border-slate-300 space-y-3 shadow-sm">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("citizen.step4", lang)}</h3>
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => setSeverity("STANDARD")}
-                      className={`min-h-[48px] py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-center ${
-                        severity === "STANDARD"
-                          ? "bg-blue-600 text-white border-blue-500 shadow-sm"
-                          : theme === "dark" ? "bg-slate-900 border-white/10 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-700"
+                      className={`min-h-[48px] py-2.5 px-3 rounded-lg border text-xs font-bold text-center ${
+                        severity === "STANDARD" ? "bg-slate-800 text-white border-slate-900" : "bg-slate-100 text-slate-700 border-slate-300"
                       }`}
                     >
                       Standard
@@ -691,10 +643,8 @@ export default function CitizenDashboard() {
                     <button
                       type="button"
                       onClick={() => setSeverity("HIGH")}
-                      className={`min-h-[48px] py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-center ${
-                        severity === "HIGH"
-                          ? "bg-amber-600 text-white border-amber-500 shadow-sm"
-                          : theme === "dark" ? "bg-slate-900 border-white/10 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-700"
+                      className={`min-h-[48px] py-2.5 px-3 rounded-lg border text-xs font-bold text-center ${
+                        severity === "HIGH" ? "bg-amber-600 text-white border-amber-700" : "bg-slate-100 text-slate-700 border-slate-300"
                       }`}
                     >
                       High
@@ -702,10 +652,8 @@ export default function CitizenDashboard() {
                     <button
                       type="button"
                       onClick={() => setSeverity("EMERGENCY")}
-                      className={`min-h-[48px] py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-center ${
-                        severity === "EMERGENCY"
-                          ? "bg-rose-600 text-white border-rose-500 shadow-sm"
-                          : theme === "dark" ? "bg-slate-900 border-white/10 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-700"
+                      className={`min-h-[48px] py-2.5 px-3 rounded-lg border text-xs font-bold text-center ${
+                        severity === "EMERGENCY" ? "bg-rose-700 text-white border-rose-800" : "bg-slate-100 text-slate-700 border-slate-300"
                       }`}
                     >
                       Emergency
@@ -713,67 +661,55 @@ export default function CitizenDashboard() {
                   </div>
                 </div>
 
-                {/* STEP 5: DESCRIPTION & SUBJECT */}
-                <div className={`p-4 sm:p-5 rounded-2xl border text-left space-y-3.5 ${
-                  theme === "dark" ? "bg-slate-950/50 border-white/10" : "bg-white border-slate-200 shadow-sm"
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <span className="h-6 w-6 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-mono font-bold flex items-center justify-center">5</span>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200 dark:text-white">Short Description</h3>
-                  </div>
-
+                {/* STEP 5: DESCRIPTION */}
+                <div className="p-4 rounded-xl bg-white border border-slate-300 space-y-3 shadow-sm">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">{t("citizen.step5", lang)}</h3>
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Headline</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Issue Headline</label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Deep pothole causing traffic obstruction"
+                      placeholder={t("citizen.headline.placeholder", lang)}
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      className={`w-full min-h-[48px] px-4 py-3 rounded-xl border text-xs outline-none focus:border-indigo-500 transition-all ${
-                        theme === "dark" ? "bg-slate-900 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900"
-                      }`}
+                      className="w-full min-h-[48px] px-3.5 py-3 rounded-lg border border-slate-400 bg-white text-slate-900 text-xs font-medium outline-none focus:border-blue-700"
                     />
                   </div>
-
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-1">Details</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Additional Details</label>
                     <textarea
                       rows={2}
                       required
-                      placeholder="Describe the issue briefly for the field officer."
+                      placeholder={t("citizen.details.placeholder", lang)}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      className={`w-full px-4 py-3 rounded-xl border text-xs outline-none focus:border-indigo-500 transition-all ${
-                        theme === "dark" ? "bg-slate-900 border-white/10 text-white" : "bg-slate-50 border-slate-200 text-slate-900"
-                      }`}
+                      className="w-full px-3.5 py-3 rounded-lg border border-slate-400 bg-white text-slate-900 text-xs font-medium outline-none focus:border-blue-700"
                     />
                   </div>
                 </div>
 
-                {/* Submission Error Banner */}
                 {submissionError && (
-                  <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center gap-2 text-xs text-rose-400">
-                    <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                  <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-300 flex items-center gap-2 text-xs text-rose-900 font-bold">
+                    <AlertTriangle className="h-4 w-4 text-rose-700 flex-shrink-0" />
                     <span>{submissionError}</span>
                   </div>
                 )}
 
-                {/* SUBMIT ACTION BUTTON */}
+                {/* SUBMIT BUTTON */}
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full min-h-[56px] py-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 text-white font-bold text-sm uppercase tracking-wider transition-all shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="w-full min-h-[56px] py-4 rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold text-sm uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {submitting ? (
                     <>
-                      <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                      <span>Submitting Grievance...</span>
+                      <RefreshCw className="h-5 w-5 animate-spin" />
+                      <span>{t("citizen.submitting", lang)}</span>
                     </>
                   ) : (
                     <>
                       <ShieldCheck className="h-5 w-5" />
-                      <span>Submit Grievance</span>
+                      <span>{t("citizen.submit", lang)}</span>
                     </>
                   )}
                 </button>
@@ -784,128 +720,86 @@ export default function CitizenDashboard() {
           </div>
         )}
 
-        {/* WORKFLOW TAB 2: MY GRIEVANCES & TRACKING */}
+        {/* TAB 2: MY GRIEVANCES */}
         {activeTab === "list" && (
-          <div className="space-y-4 text-left">
+          <div className="space-y-4">
 
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className={`text-xl font-black ${theme === "dark" ? "text-white" : "text-slate-900"}`}>
-                  My Grievances
-                </h1>
-                <p className="text-xs text-slate-400 mt-0.5">Track resolution status and officer audits.</p>
-              </div>
-
-              <button
-                onClick={() => { setActiveTab("submit"); setSuccessId(null); }}
-                className="min-h-[44px] px-3.5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5"
-              >
-                <PlusCircle className="h-4 w-4" />
-                <span>New</span>
-              </button>
-            </div>
-
-            {/* Filter Bar */}
+            {/* Filter */}
             <div className="relative">
-              <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3.5 top-3.5 h-4 w-4 text-slate-500" />
               <input
                 type="text"
-                placeholder="Search tracking ID or title..."
+                placeholder="Search by Tracking ID or headline..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full min-h-[48px] pl-10 pr-4 py-3 rounded-xl border text-xs outline-none focus:border-indigo-500 transition-all ${
-                  theme === "dark" ? "bg-slate-900 border-white/10 text-white" : "bg-white border-slate-200 text-slate-900"
-                }`}
+                className="w-full min-h-[48px] pl-10 pr-4 py-3 rounded-lg border border-slate-300 bg-white text-slate-900 text-xs font-medium outline-none focus:border-blue-700"
               />
             </div>
 
-            {/* Grievance Cards List */}
             {filteredComplaints.length === 0 ? (
-              <div className={`p-8 rounded-2xl border text-center space-y-3 ${
-                theme === "dark" ? "bg-slate-950/30 border-white/5" : "bg-white border-slate-200"
-              }`}>
-                <FileText className="h-8 w-8 text-slate-500 mx-auto" />
-                <p className="text-xs text-slate-400">No grievances match your filter.</p>
+              <div className="p-8 rounded-xl bg-white border border-slate-300 text-center space-y-2">
+                <FileText className="h-8 w-8 text-slate-400 mx-auto" />
+                <p className="text-xs text-slate-600 font-medium">No grievances registered yet.</p>
               </div>
             ) : (
               filteredComplaints.map((c) => (
                 <div
                   key={c.id}
                   onClick={() => setSelectedComplaint(c)}
-                  className={`p-4 rounded-2xl border text-left cursor-pointer transition-all hover:scale-[1.005] ${
-                    selectedComplaint?.id === c.id
-                      ? "bg-indigo-500/10 border-indigo-500/30 shadow-md shadow-indigo-500/10"
-                      : theme === "dark"
-                      ? "bg-slate-950/50 border-white/10 hover:border-indigo-500/20"
-                      : "bg-white border-slate-200 hover:border-slate-300 shadow-sm"
-                  }`}
+                  className="p-4 rounded-xl bg-white border border-slate-300 hover:border-blue-600 cursor-pointer transition-all shadow-sm space-y-2"
                 >
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-[11px] font-mono text-indigo-400 font-bold">{c.trackingId}</span>
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                      c.status === "RESOLVED"
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        : c.status === "CLOSED"
-                        ? "bg-slate-800 text-slate-400"
-                        : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                    }`}>
-                      {c.status}
-                    </span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-mono font-bold text-blue-900">{c.trackingId}</span>
+                    {getStatusBadge(c.status)}
                   </div>
-                  <h4 className={`text-sm font-bold ${theme === "dark" ? "text-white" : "text-slate-800"}`}>{c.title}</h4>
-                  <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                    <MapPin className="h-3 w-3 text-slate-500 flex-shrink-0" />
+                  <h4 className="text-sm font-bold text-slate-900">{c.title}</h4>
+                  <p className="text-xs text-slate-600 flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5 text-slate-500 flex-shrink-0" />
                     <span className="truncate">{c.address}</span>
                   </p>
                 </div>
               ))
             )}
 
-            {/* Grievance Details Drawer / Modal */}
+            {/* Complaint Detail Modal */}
             {selectedComplaint && (
-              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm">
-                <div className={`w-full max-w-lg p-5 rounded-t-3xl sm:rounded-3xl border space-y-4 max-h-[85vh] overflow-y-auto ${
-                  theme === "dark" ? "bg-[#080812] border-white/10 text-slate-100" : "bg-white border-slate-200 text-slate-900"
-                }`}>
-                  <div className="flex items-center justify-between border-b pb-3 border-white/10">
+              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/80 backdrop-blur-sm">
+                <div className="w-full max-w-lg p-5 rounded-t-2xl sm:rounded-2xl bg-white border border-slate-300 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl">
+                  <div className="flex items-center justify-between border-b pb-3 border-slate-200">
                     <div>
-                      <span className="text-[10px] font-mono text-indigo-400 font-bold uppercase">{selectedComplaint.trackingId}</span>
-                      <h3 className="text-sm font-bold">{selectedComplaint.title}</h3>
+                      <span className="text-xs font-mono font-bold text-blue-900 block">{selectedComplaint.trackingId}</span>
+                      <h3 className="text-sm font-bold text-slate-900">{selectedComplaint.title}</h3>
                     </div>
-                    <button onClick={() => setSelectedComplaint(null)} className="p-2 text-slate-400 hover:text-white min-h-[44px] min-w-[44px]">✕</button>
+                    <button onClick={() => setSelectedComplaint(null)} className="p-2 text-slate-500 hover:text-slate-900 font-bold min-h-[44px] min-w-[44px]">✕</button>
                   </div>
 
                   <div className="space-y-3 text-xs">
-                    <p className="text-slate-300 leading-relaxed">{selectedComplaint.description}</p>
-                    <div className="p-3 rounded-xl bg-black/40 border border-white/5 font-mono text-[11px] text-slate-400 space-y-1">
-                      <div>Address: <span className="text-slate-200">{selectedComplaint.address}</span></div>
-                      <div>Category: <span className="text-indigo-300">{selectedComplaint.category}</span></div>
-                      <div>Status: <span className="text-emerald-300 font-bold">{selectedComplaint.status}</span></div>
+                    <p className="text-slate-700 leading-relaxed font-medium">{selectedComplaint.description}</p>
+                    <div className="p-3 rounded-lg bg-slate-100 border border-slate-200 space-y-1 text-slate-800 font-medium">
+                      <div>Location: <strong>{selectedComplaint.address}</strong></div>
+                      <div>Category: <strong>{selectedComplaint.category}</strong></div>
+                      <div>Status: <strong>{selectedComplaint.status}</strong></div>
                     </div>
 
                     {selectedComplaint.beforePhotoUrl && (
-                      <img
-                        src={selectedComplaint.beforePhotoUrl}
-                        alt="Evidence"
-                        className="max-h-44 mx-auto rounded-xl object-contain bg-black/40 border border-white/5"
-                      />
+                      <img src={selectedComplaint.beforePhotoUrl} alt="Evidence" className="max-h-48 mx-auto rounded-lg object-contain border border-slate-300" />
                     )}
 
                     {selectedComplaint.status === "RESOLVED" && (
-                      <div className="pt-3 border-t border-white/10 space-y-3">
-                        <p className="text-xs text-indigo-400 font-bold">
+                      <div className="pt-3 border-t border-slate-200 space-y-3">
+                        <p className="text-xs text-blue-900 font-bold">
                           Field officer submitted resolution proof. Confirm resolution:
                         </p>
                         <div className="grid grid-cols-2 gap-2">
                           <button
                             onClick={() => handleResolutionConfirmation(selectedComplaint.id, true)}
-                            className="min-h-[48px] py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase"
+                            className="min-h-[48px] py-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase shadow-sm"
                           >
                             Accept & Close
                           </button>
                           <button
                             onClick={() => handleResolutionConfirmation(selectedComplaint.id, false)}
-                            className="min-h-[48px] py-3 rounded-xl bg-slate-900 border border-white/10 text-slate-300 font-bold text-xs uppercase"
+                            className="min-h-[48px] py-3 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold text-xs uppercase"
                           >
                             Dispute Resolution
                           </button>
@@ -921,29 +815,6 @@ export default function CitizenDashboard() {
         )}
 
       </main>
-
-      {/* Sticky Bottom Navigation Bar (Mobile Thumb Operations) */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#06060f]/95 backdrop-blur-xl border-t border-white/10 px-4 py-2 flex items-center justify-around md:hidden">
-        <button
-          onClick={() => { setActiveTab("submit"); setSelectedComplaint(null); }}
-          className={`flex flex-col items-center justify-center py-1 px-4 rounded-xl min-h-[48px] transition-all ${
-            activeTab === "submit" ? "text-indigo-400 font-bold" : "text-slate-400"
-          }`}
-        >
-          <PlusCircle className="h-5 w-5 mb-0.5" />
-          <span className="text-[10px]">Report Issue</span>
-        </button>
-
-        <button
-          onClick={() => { setActiveTab("list"); setSelectedComplaint(null); }}
-          className={`flex flex-col items-center justify-center py-1 px-4 rounded-xl min-h-[48px] transition-all ${
-            activeTab === "list" ? "text-indigo-400 font-bold" : "text-slate-400"
-          }`}
-        >
-          <ListFilter className="h-5 w-5 mb-0.5" />
-          <span className="text-[10px]">My Grievances ({complaints.length})</span>
-        </button>
-      </nav>
 
     </div>
   );

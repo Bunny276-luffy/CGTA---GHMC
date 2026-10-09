@@ -65,12 +65,45 @@ export interface AuditLog {
   timestamp?: Date | string;
 }
 
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  message: string;
+  read: boolean | number;
+  created_at?: Date | string;
+}
+
+export interface CategoryStat {
+  category: string;
+  count: number;
+}
+
+export interface VerificationStats {
+  totalReports: number;
+  avgTrustScore: number;
+  highTrust: number;
+  lowTrust: number;
+  duplicatesFlagged: number;
+  manipulationFlagged: number;
+}
+
 export interface DashboardStats {
   total: number;
   resolved: number;
   inProgress: number;
   submitted: number;
   assigned: number;
+}
+
+export interface SystemErrorLog {
+  id: string;
+  area: string;
+  endpoint?: string | null;
+  severity: "INFO" | "WARNING" | "ERROR" | "CRITICAL";
+  status?: string;
+  message: string;
+  details?: string | null;
+  timestamp?: Date | string;
 }
 
 export interface DatabaseRepository {
@@ -82,18 +115,53 @@ export interface DatabaseRepository {
   // Complaints
   createComplaint(complaint: Omit<Complaint, 'id' | 'created_at' | 'updated_at' | 'tracking_id'>, evidence?: Omit<Evidence, 'id' | 'complaint_id' | 'uploaded_at'>): Promise<Complaint>;
   getComplaintByTrackingId(trackingId: string): Promise<Complaint | null>;
+  getComplaintById(complaintId: string): Promise<Complaint | null>;
   getComplaintsByUserId(userId: string): Promise<Complaint[]>;
   getAllComplaints(): Promise<Complaint[]>;
   getComplaintsByOfficerId(officerId: string): Promise<Complaint[]>;
-  updateComplaintStatus(complaintId: string, status: string, assignedOfficerId?: string): Promise<void>;
+  updateComplaintStatus(
+    complaintId: string,
+    status: string,
+    options?: {
+      assignedOfficerId?: string | null;
+      resolutionPhotoUrl?: string;
+      rejectionCount?: number;
+      citizenConfirmed?: boolean;
+    }
+  ): Promise<void>;
+
+  // Users (admin)
+  listUsers(limit?: number): Promise<User[]>;
+  updatePasswordHash(userId: string, passwordHash: string): Promise<void>;
   
   // AI Reports
   createAIReport(report: Omit<AIReport, 'id' | 'checked_at'>): Promise<AIReport>;
   getAIReportByComplaintId(complaintId: string): Promise<AIReport | null>;
   getEvidenceByComplaintId(complaintId: string): Promise<Evidence | null>;
+  createComplaintEvidence(
+    complaintId: string,
+    evidence: { file_url: string; file_type: string; size_bytes: number; metadata?: string }
+  ): Promise<void>;
 
   // Audit
   createAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>): Promise<void>;
+  getAuditLogs(limit?: number): Promise<AuditLog[]>;
+
+  // System Errors & Logging
+  createSystemError(error: Omit<SystemErrorLog, 'id' | 'timestamp'>): Promise<void>;
+  getSystemErrors(limit?: number): Promise<SystemErrorLog[]>;
+
+  // Health
+  checkHealth(): Promise<{ ok: boolean; latencyMs: number; provider: string; error?: string }>;
+
+  // Notifications (workflow alerts for the complaint owner)
+  createNotification(userId: string, message: string): Promise<void>;
+  getNotificationsByUserId(userId: string, limit?: number): Promise<AppNotification[]>;
+  markNotificationsRead(userId: string): Promise<void>;
+
+  // Analytics (real aggregates — no fabricated numbers anywhere)
+  getCategoryStats(): Promise<CategoryStat[]>;
+  getVerificationStats(): Promise<VerificationStats>;
 
   // Analytics
   getDashboardStats(): Promise<DashboardStats>;

@@ -19,7 +19,7 @@ export default function FAQSection() {
   const faqs: FAQItem[] = [
     {
       q: "What is Geofence Verification and how does it prevent fraud?",
-      a: "When a citizen or officer uploads a complaint, our engine extracts the GPS coordinates embedded in the photo's EXIF header and calculates the Haversine distance to the reported address. If the distance exceeds 100 meters, the complaint is flagged automatically—preventing users from uploading old or downloaded internet photos.",
+      a: "When evidence is submitted, the engine reads the GPS coordinates stored in the photo's EXIF header and computes the Haversine distance to the reported location. If the distance exceeds the 100 m tolerance, the evidence is flagged for review — making it harder to pass off old or downloaded photos as fresh, on-site evidence.",
       category: "Geofence Audit",
       icon: <MapPin className="h-4.5 w-4.5 text-emerald-400" />,
       glowColor: "from-emerald-500/20 via-slate-950 to-slate-950",
@@ -29,21 +29,21 @@ export default function FAQSection() {
       q: "What happens if a camera strips EXIF metadata from uploaded photos?",
       a: "Certain messaging platforms or camera apps strip EXIF headers. When this occurs, our EXIF scanner flags the file. The complaint is still accepted, but its Trust Score is degraded, and it is routed for mandatory double-verification by the assigned officer's GPS radar.",
       category: "EXIF Anti-Forgery",
-      icon: <FileCheck2 className="h-4.5 w-4.5 text-cyan-400" />,
-      glowColor: "from-cyan-500/20 via-slate-950 to-slate-950",
-      borderColor: "border-cyan-500/40"
+      icon: <FileCheck2 className="h-4.5 w-4.5 text-indigo-400" />,
+      glowColor: "from-indigo-500/20 via-slate-950 to-slate-950",
+      borderColor: "border-indigo-500/40"
     },
     {
-      q: "How does the Spatial Deduplication Engine consolidate reports?",
-      a: "Our engine continuously runs spatial radius calculations looking for active tickets within a 50-meter radius in the same ward category. Matching complaints are automatically merged into a single Master Ticket to prevent duplicate municipal dispatches.",
-      category: "Spatial Deduplication",
-      icon: <Layers className="h-4.5 w-4.5 text-purple-400" />,
-      glowColor: "from-purple-500/20 via-slate-950 to-slate-950",
-      borderColor: "border-purple-500/40"
+      q: "How does duplicate detection consolidate reports?",
+      a: "Every submission is fingerprinted twice — an exact SHA-256 file hash and a perceptual dHash that survives resizing or recompression. Near-duplicate evidence is flagged and linked so reviewers can see that multiple reports may describe the same underlying problem. Automatic issue clustering and merging is on the roadmap; today flagged duplicates are surfaced for reviewer judgement rather than silently merged.",
+      category: "Duplicate Detection",
+      icon: <Layers className="h-4.5 w-4.5 text-amber-400" />,
+      glowColor: "from-amber-500/20 via-slate-950 to-slate-950",
+      borderColor: "border-amber-500/40"
     },
     {
       q: "Can I track complaint progress and auditor logs without an account?",
-      a: "Yes. Every grievance generates a unique tracking hash (e.g. #CGTA-2026-8802). Anyone can enter this ID on the public transparency portal to inspect GPS coordinate compliance, resolution timestamps, and immutable audit logs.",
+      a: "Yes. Every grievance generates a unique tracking ID (e.g. CGTA-2026-8802). Anyone can enter this ID on the public tracking portal to inspect the current status, verification verdict, and the recorded audit trail for that grievance.",
       category: "Public Ledger",
       icon: <ShieldCheck className="h-4.5 w-4.5 text-amber-400" />,
       glowColor: "from-amber-500/20 via-slate-950 to-slate-950",
@@ -63,7 +63,7 @@ export default function FAQSection() {
     <section id="faq" className="py-32 border-t border-white/5 bg-transparent relative z-10 overflow-hidden">
       
       {/* Dynamic Glowing Background Effects */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[450px] w-[650px] bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-emerald-500/10 blur-[130px] pointer-events-none rounded-full" />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[450px] w-[650px] bg-gradient-to-r from-indigo-500/10 via-amber-500/10 to-emerald-500/10 blur-[130px] pointer-events-none rounded-full" />
       
       {/* Decorative Grid Dot Matrix */}
       <div 
@@ -81,7 +81,7 @@ export default function FAQSection() {
           <AnimatedText
             tag="h2"
             text="Frequently Asked Questions"
-            className="text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-indigo-200 to-purple-300 drop-shadow-[0_0_20px_rgba(56,189,248,0.4)] tracking-tight leading-tight font-sans"
+            className="text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 via-indigo-300 to-emerald-300 tracking-tight leading-tight font-sans"
           />
           <p className="text-sm text-slate-400 leading-relaxed font-sans">
             Clear answers about geofencing, EXIF metadata scanning, duplicate filtering, and public ledger tracking.
@@ -98,13 +98,13 @@ export default function FAQSection() {
                 key={idx}
                 className={`relative rounded-3xl border transition-all duration-500 overflow-hidden backdrop-blur-xl ${
                   isOpen
-                    ? `bg-slate-950/90 ${faq.borderColor} shadow-2xl shadow-cyan-950/40 scale-[1.01]`
+                    ? `bg-slate-950/90 ${faq.borderColor} shadow-2xl shadow-indigo-950/40 scale-[1.01]`
                     : "bg-slate-950/50 border-white/10 hover:border-white/20 hover:bg-slate-900/60"
                 }`}
               >
                 {/* Glowing Ambient Light Line on Active Card */}
                 {isOpen && (
-                  <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-gradient-to-b from-cyan-400 via-blue-500 to-purple-500" />
+                  <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-gradient-to-b from-indigo-400 via-blue-500 to-amber-500" />
                 )}
 
                 {/* Question Header Bar */}
@@ -123,14 +123,14 @@ export default function FAQSection() {
                       <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 block">
                         {faq.category}
                       </span>
-                      <h4 className="text-sm md:text-base font-mono font-bold text-white leading-snug group-hover:text-cyan-300 transition-colors">
+                      <h4 className="text-sm md:text-base font-mono font-bold text-white leading-snug group-hover:text-indigo-300 transition-colors">
                         {faq.q}
                       </h4>
                     </div>
                   </div>
 
                   <ChevronDown className={`h-5 w-5 text-slate-400 transition-transform duration-300 flex-shrink-0 ${
-                    isOpen ? "transform rotate-180 text-cyan-400" : "group-hover:text-white"
+                    isOpen ? "transform rotate-180 text-indigo-400" : "group-hover:text-white"
                   }`} />
                 </button>
 

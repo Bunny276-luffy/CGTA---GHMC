@@ -1,90 +1,109 @@
 import { NextResponse } from "next/server";
 import { getRepository } from "../../../../lib/db";
 import { runVerificationPipeline, getCachedVerificationResult } from "../../../../lib/verification-engine";
+import { getDepartmentForCategory, evaluateSla } from "../../../../lib/config";
+import { requireAuth, tooManyRequests } from "../../../../lib/api-auth";
+import { rateLimit, getClientIp } from "../../../../lib/rate-limit";
+import {
+  cleanText,
+  validateLatitude,
+  validateLongitude,
+  VALID_CATEGORIES,
+  VALID_SEVERITIES
+} from "../../../../lib/validation";
+import { validateEvidenceUpload } from "../../../../lib/upload-security";
+import { verifyCaptchaToken } from "../../../../lib/captcha";
+import { logSystemError } from "../../../../lib/error-logger";
 
 export async function POST(req: Request) {
-  try {
-    const {
-      title,
-      description,
-      category,
-      latitude,
-      longitude,
-      address,
-      severity,
-      anonymous,
-      beforePhotoUrl,
-      photoName,
-      exifLat,
-      exifLng,
-      exifSoftware,
-      createdById,
-      verificationToken,
-      sha256Hash
-    } = await req.json();
+  const guard = await requireAuth(req, ["CITIZEN"]);
+  if (!guard.ok) return guard.response;
+  const session = guard.session;
+  const ip = getClientIp(req);
 
-    if (!title || !description || !category || !latitude || !longitude || !createdById) {
+  const limit = rateLimit(`submit:${ip}`, 12, 60 * 60 * 1000);
+  if (!limit.ok) return tooManyRequests(limit.retryAfterSeconds);
+
+  try {
+    const body = await req.json().catch(() => ({}) as any);
+    const createdById = session.id;
+
+    // CAPTCHA check
+    const captchaResult = await verifyCaptchaToken(body.captchaToken, ip);
+    if (!captchaResult.ok) {
+      await logSystemError({
+        area: "AUTH",
+        endpoint: "/api/complaints/submit",
+        severity: "WARNING",
+        message: `CAPTCHA validation failed during grievance submit from IP ${ip}`,
+      });
+      return NextResponse.json({ message: captchaResult.message || "CAPTCHA verification failed" }, { status: 400 });
+    }
+
+    const title = cleanText(body.title, 200);
+    const description = cleanText(body.description, 2000);
+    const address = cleanText(body.address, 300);
+    const category = VALID_CATEGORIES.includes(body.category) ? body.category : null;
+    const severity = VALID_SEVERITIES.includes(body.severity) ? body.severity : "STANDARD";
+    const anonymous = Boolean(body.anonymous);
+
+    if (!title || !description) {
       return NextResponse.json(
-        { message: "Missing required complaint submission parameters" },
+        { message: "A clean headline and description are required." },
+        { status: 400 }
+      );
+    }
+    if (!category) {
+      return NextResponse.json({ message: "Invalid grievance category." }, { status: 400 });
+    }
+    if (!validateLatitude(body.latitude) || !validateLongitude(body.longitude)) {
+      return NextResponse.json(
+        { message: "Valid GPS coordinates are required." },
         { status: 400 }
       );
     }
 
-    try {
-      const repo = getRepository();
-      const userRes = await repo.getUserByEmail(createdById); // Wait, this expects ID not email! I need to use getUserId? Let's check how the user is queried.
-      // Ah, wait, in existing code it's `SELECT id, role FROM users WHERE id = $1`, [createdById]
-      // I should add getUserById to the repository. Let me just implement it later in repo, and use it here.
-      // Let's add it to repo types: getUserById(id: string): Promise<User | null>;
-      
-      const user = await repo.getUserById(createdById);
-      if (!user) {
-        return NextResponse.json(
-          { message: "Unauthorized: User session node not found" },
-          { status: 401 }
-        );
+    const latitude = body.latitude as number;
+    const longitude = body.longitude as number;
+
+    const photoDataUrl = typeof body.beforePhotoUrl === "string" && body.beforePhotoUrl ? body.beforePhotoUrl : null;
+    let fileBuffer: Buffer | undefined = undefined;
+    let computedFileSize = 245000;
+    let safeFileName = "evidence_photo.jpg";
+
+    if (photoDataUrl) {
+      const uploadCheck = validateEvidenceUpload(photoDataUrl, body.photoName);
+      if (!uploadCheck.ok) {
+        await logSystemError({
+          area: "UPLOAD",
+          endpoint: "/api/complaints/submit",
+          severity: "WARNING",
+          message: `Evidence file upload security check rejected file: ${uploadCheck.error}`,
+        });
+        return NextResponse.json({ message: uploadCheck.error }, { status: 400 });
       }
-      if (user.role !== "CITIZEN") {
-        return NextResponse.json(
-          { message: "Forbidden: Only citizens can submit complaints" },
-          { status: 403 }
-        );
-      }
-    } catch (dbError: any) {
-      console.error("COMPLAINTS AUTH VALIDATION ERROR:", dbError.message);
-      return NextResponse.json(
-        { message: "Service temporarily unavailable. Please try again." },
-        { status: 503 }
-      );
+      fileBuffer = uploadCheck.buffer;
+      computedFileSize = uploadCheck.sizeBytes || 245000;
+      safeFileName = uploadCheck.safeFileName || safeFileName;
     }
 
     // Safe server-side reuse of previously verified result (eliminates double pipeline execution)
-    let verificationResult = (verificationToken ? getCachedVerificationResult(verificationToken) : null) ||
-                            (sha256Hash ? getCachedVerificationResult(sha256Hash) : null);
+    let verificationResult =
+      (body.verificationToken ? getCachedVerificationResult(body.verificationToken) : null) ||
+      (body.sha256Hash ? getCachedVerificationResult(body.sha256Hash) : null);
 
     if (!verificationResult) {
-      // Fallback: execute pipeline if not pre-verified or cache expired
-      let fileBuffer: Buffer | undefined = undefined;
-      let computedFileSize = 245000;
-      if (beforePhotoUrl && beforePhotoUrl.startsWith("data:")) {
-        const base64Data = beforePhotoUrl.split(",")[1];
-        if (base64Data) {
-          fileBuffer = Buffer.from(base64Data, "base64");
-          computedFileSize = fileBuffer.length;
-        }
-      }
-
       verificationResult = await runVerificationPipeline({
-        fileName: photoName || "evidence_photo.jpg",
+        fileName: safeFileName,
         fileSize: computedFileSize,
         fileType: "image/jpeg",
         category,
         description,
-        address,
+        address: address || undefined,
         userLat: latitude,
         userLng: longitude,
-        deviceLat: exifLat || latitude,
-        deviceLng: exifLng || longitude,
+        deviceLat: typeof body.exifLat === "number" ? body.exifLat : latitude,
+        deviceLng: typeof body.exifLng === "number" ? body.exifLng : longitude,
         fileLastModified: Date.now(),
         fileData: fileBuffer,
         severity
@@ -94,12 +113,16 @@ export async function POST(req: Request) {
     const trustScore = verificationResult.trustScore;
     const priorityPredicted = verificationResult.xaiReport.suggestedPriority || severity || "STANDARD";
     const explainableReport = verificationResult.xaiReport.summary;
-    // Tracking ID is now securely generated by the database/repository.
+
+    const routedDepartment = getDepartmentForCategory(category);
+    const sla = evaluateSla(new Date(), severity);
 
     const duplicateDetected = verificationResult.isDuplicate;
     const duplicateParentId = verificationResult.duplicateLinkedId;
     const forgeryScore = verificationResult.manipulationDetected ? 85.0 : 0.0;
+
     let complaintId = "";
+    let realTrackingId = "";
     try {
       const repo = getRepository();
 
@@ -112,20 +135,19 @@ export async function POST(req: Request) {
           longitude,
           address: address || "Geocoded address",
           severity: priorityPredicted,
-          anonymous: anonymous || false,
-          before_photo_url: beforePhotoUrl || null,
+          anonymous,
+          before_photo_url: photoDataUrl ?? undefined,
           created_by_id: createdById,
           status: trustScore >= 60.0 ? "SUBMITTED" : "TPA_REVIEW"
-        },
-        undefined // evidence can be handled separately or added if needed. Wait, evidence was not inserted in the original? Ah, it was inserted in ai_reports but not evidence table in the original? Wait, let's look.
-        // The original code did: INSERT INTO complaints... then INSERT INTO ai_reports... then INSERT INTO audit_logs. It didn't insert into evidence table!
+        }
       );
 
       complaintId = newComplaint.id;
+      realTrackingId = newComplaint.tracking_id;
 
       await repo.createAIReport({
         complaint_id: complaintId,
-        exif_data: { exifLat, exifLng, exifSoftware },
+        exif_data: { exifLat: body.exifLat, exifLng: body.exifLng, exifSoftware: cleanText(body.exifSoftware, 200) },
         duplicate_detected: duplicateDetected,
         duplicate_parent_id: duplicateParentId,
         forgery_score: forgeryScore,
@@ -139,14 +161,17 @@ export async function POST(req: Request) {
       await repo.createAuditLog({
         user_id: createdById,
         action: "SUBMIT_COMPLAINT",
-        details: `Filed grievance ${newComplaint.tracking_id} with Trust Score: ${trustScore}%`
+        details: `Filed grievance ${realTrackingId} with Trust Score: ${trustScore}%` +
+          (routedDepartment ? ` — routed to ${routedDepartment.name}` : "")
       });
-
-      // Override trackingId with the real one generated by the repo
-      var realTrackingId = newComplaint.tracking_id;
-
     } catch (dbError: any) {
-      console.error("COMPLAINTS SUBMIT DATABASE ERROR:", dbError.message);
+      await logSystemError({
+        area: "DATABASE",
+        endpoint: "/api/complaints/submit",
+        severity: "CRITICAL",
+        message: `Database failure saving complaint for user ${createdById}`,
+        details: dbError.message,
+      });
       return NextResponse.json(
         { message: "Database persistence failed" },
         { status: 503 }
@@ -161,12 +186,20 @@ export async function POST(req: Request) {
         title,
         status: trustScore >= 60.0 ? "SUBMITTED" : "TPA_REVIEW",
         trustScore,
+        suggestedDepartment: routedDepartment ? routedDepartment.name : null,
+        sla,
         verificationResult,
         explainableReport
       }
     });
 
   } catch (error: any) {
+    await logSystemError({
+      area: "SYSTEM",
+      endpoint: "/api/complaints/submit",
+      severity: "ERROR",
+      message: `Unhandled exception during complaint submission: ${error.message}`,
+    });
     return NextResponse.json(
       { message: error.message || "Internal Server Error" },
       { status: 500 }

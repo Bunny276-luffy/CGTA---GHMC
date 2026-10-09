@@ -35,7 +35,15 @@ if (typeof window === "undefined") {
   }
 }
 
-const DEFAULT_GPS_TOLERANCE_METERS = 100;
+// GPS tolerance comes from the jurisdiction deployment profile (configurable
+// per local body / issue type), with a safe fallback if config is unavailable.
+function gpsTolerance(): number {
+  try {
+    return require("./config").getJurisdictionConfig().verification.gpsToleranceMeters;
+  } catch {
+    return 100;
+  }
+}
 
 function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371000; // Earth's radius in meters
@@ -341,6 +349,19 @@ export function cacheVerificationResult(
       verificationCache.delete(k);
     }
   });
+  // Hard size cap: under a burst of uploads the cache must never grow
+  // unbounded (each write adds up to two entries).
+  const MAX_CACHE_ENTRIES = 1000;
+  if (verificationCache.size > MAX_CACHE_ENTRIES) {
+    const overflow = verificationCache.size - MAX_CACHE_ENTRIES;
+    let removed = 0;
+    verificationCache.forEach((v, k) => {
+      if (removed < overflow) {
+        verificationCache.delete(k);
+        removed += 1;
+      }
+    });
+  }
 
   const entry: CachedVerification = {
     token,
@@ -889,7 +910,7 @@ export async function runVerificationPipeline(input: VerificationInput): Promise
       complaintLongitude!
     );
 
-    if (gpsDistanceMeters <= DEFAULT_GPS_TOLERANCE_METERS) {
+    if (gpsDistanceMeters <= gpsTolerance()) {
       gpsVerification = "MATCH";
       gpsAnomalyDescription = "Location verified: Photo geotags match complaint coordinates.";
     } else {
@@ -977,7 +998,7 @@ export async function runVerificationPipeline(input: VerificationInput): Promise
 
   let gpsConfidenceScore = 100;
   if (!gpsAvailable) gpsConfidenceScore -= 40;
-  if (gpsDistanceMeters !== null && gpsDistanceMeters > DEFAULT_GPS_TOLERANCE_METERS) gpsConfidenceScore -= 20;
+  if (gpsDistanceMeters !== null && gpsDistanceMeters > gpsTolerance()) gpsConfidenceScore -= 20;
   gpsConfidenceScore = Math.max(10, gpsConfidenceScore);
 
   // --- STAGE 7: Real Timestamp Verification ---
@@ -1236,29 +1257,37 @@ export async function runVerificationPipeline(input: VerificationInput): Promise
       const hasDbUrl = process.env.DATABASE_URL && process.env.DATABASE_URL.trim().length > 0;
       if (typeof window === "undefined" && hasDbUrl) {
         try {
-          const dbModule = require("./db");
+          const provider = process.env.DATABASE_PROVIDER || "sqlite";
+          let exactRes: { rowCount?: number; rows: any[] } = { rowCount: 0, rows: [] };
+          let nearResRows: any[] = [];
 
-          // Exact lookup via SHA-256
-          const exactRes = await dbModule.db.query(
-            "SELECT complaint_id FROM ai_reports WHERE image_sha256 = $1 LIMIT 1",
-            [sha256Hash]
-          );
+          if (provider === "postgres") {
+            const { getPool } = require("./repositories/postgres");
+            const pool = getPool();
+            const res = await pool.query(
+              "SELECT complaint_id FROM ai_reports WHERE image_sha256 = $1 LIMIT 1",
+              [sha256Hash]
+            );
+            exactRes = { rowCount: res.rowCount || res.rows.length, rows: res.rows };
+
+            if (!exactRes.rowCount) {
+              const resNear = await pool.query(
+                "SELECT complaint_id, image_phash FROM ai_reports WHERE image_phash IS NOT NULL"
+              );
+              nearResRows = resNear.rows;
+            }
+          }
 
           if (exactRes.rowCount && exactRes.rowCount > 0) {
             matchedRecord = {
               complaint_id: exactRes.rows[0].complaint_id,
               type: "EXACT"
             };
-          } else {
-            // Near-duplicate lookup via dHash
-            const nearRes = await dbModule.db.query(
-              "SELECT complaint_id, image_phash FROM ai_reports WHERE image_phash IS NOT NULL"
-            );
-
+          } else if (nearResRows.length > 0) {
             let bestDistance = 64;
             let bestParentId: string | null = null;
 
-            for (const row of nearRes.rows) {
+            for (const row of nearResRows) {
               if (row.image_phash && row.image_phash.length === 16) {
                 const dist = calculateHammingDistance(row.image_phash, currentPhash);
                 if (dist < bestDistance) {

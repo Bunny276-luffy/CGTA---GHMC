@@ -1,11 +1,11 @@
 /**
- * CivicTrust Official Imagery Assets
- * 
- * Source: Unsplash (Real, original web images)
- * License: Unsplash License (Free to use under the Unsplash License)
- * 
- * These images replace the previous AI-generated assets with authentic
- * real-world photographs representing civic issues and government operations.
+ * CivicTrust Decorative Imagery
+ *
+ * Source: Unsplash (used under the Unsplash License)
+ *
+ * These images are decorative landing-page backgrounds only. They are NOT
+ * evidence, NOT screenshots of the product, and NOT depictions of real
+ * CivicTrust operations.
  */
 
 export const CivicTrustAssets = {

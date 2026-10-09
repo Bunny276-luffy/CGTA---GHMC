@@ -1,3 +1,6 @@
+import { loadEnvConfig } from "@next/env";
+loadEnvConfig(process.cwd());
+
 import {
   runVerificationPipeline,
   validateImageSignature,
@@ -908,6 +911,17 @@ async function runTests() {
     assert(resDetectionFail.manipulationDetected === false, "Detection failure must not flag the report as a forgery");
 
     // === STAGE 10: Real Duplicate Image Detection Tests ===
+    const hasDbUrlForCleanup = process.env.DATABASE_URL && process.env.DATABASE_URL.trim().length > 0;
+    if (hasDbUrlForCleanup) {
+      try {
+        const { getPool } = require("../lib/repositories/postgres");
+        const pool = getPool();
+        await pool.query("DELETE FROM ai_reports");
+        await pool.query("DELETE FROM evidence");
+        await pool.query("DELETE FROM complaints");
+      } catch {}
+    }
+
     const starfishPhash = await computeDHash(starfishBuffer);
     const starfishSha = await generateFileHash(starfishBuffer);
 
@@ -1088,14 +1102,15 @@ async function runTests() {
     const hasDbUrl = process.env.DATABASE_URL && process.env.DATABASE_URL.trim().length > 0;
     if (hasDbUrl) {
       console.log("DATABASE REACHABLE: Executing real PostgreSQL lookup test...");
-      const dbModule = require("../lib/db");
-      await dbModule.db.query("DELETE FROM ai_reports WHERE image_sha256 = $1", [starfishSha]);
-      await dbModule.db.query("DELETE FROM complaints WHERE tracking_id = 'CGTA-TEST-DUP'");
+      const { getPool } = require("../lib/repositories/postgres");
+      const pool = getPool();
+      await pool.query("DELETE FROM ai_reports WHERE image_sha256 = $1", [starfishSha]);
+      await pool.query("DELETE FROM complaints WHERE tracking_id = 'CGTA-TEST-DUP'");
 
-      const userRes = await dbModule.db.query("SELECT id FROM users LIMIT 1");
+      const userRes = await pool.query("SELECT id FROM users LIMIT 1");
       if (userRes.rowCount && userRes.rowCount > 0) {
         const userId = userRes.rows[0].id;
-        const compRes = await dbModule.db.query(
+        const compRes = await pool.query(
           `INSERT INTO complaints (tracking_id, title, description, category, latitude, longitude, address, created_by_id)
            VALUES ('CGTA-TEST-DUP', 'Test Title', 'Test Description', 'Roads', 17.385, 78.4867, 'Test Address', $1)
            RETURNING id`,
@@ -1103,7 +1118,7 @@ async function runTests() {
         );
         const compId = compRes.rows[0].id;
 
-        await dbModule.db.query(
+        await pool.query(
           `INSERT INTO ai_reports (complaint_id, image_sha256, image_phash, duplicate_detected, duplicate_parent_id)
            VALUES ($1, $2, $3, false, null)`,
           [compId, starfishSha, starfishPhash]
@@ -1118,8 +1133,8 @@ async function runTests() {
           fileData: starfishBuffer
         });
 
-        await dbModule.db.query("DELETE FROM ai_reports WHERE complaint_id = $1", [compId]);
-        await dbModule.db.query("DELETE FROM complaints WHERE id = $1", [compId]);
+        await pool.query("DELETE FROM ai_reports WHERE complaint_id = $1", [compId]);
+        await pool.query("DELETE FROM complaints WHERE id = $1", [compId]);
 
         assert(dbRes.duplicateDetected === true, "Database duplicate detection must find inserted record");
         assert(dbRes.duplicateType === "EXACT_DUPLICATE", "Database duplicate type must match exact");

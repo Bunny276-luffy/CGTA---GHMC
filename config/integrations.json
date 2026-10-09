@@ -1,0 +1,60 @@
+{
+  "$note": "Manual integration slots. Each entry is a clearly-scoped place where an authorised external system plugs in. NOTHING here is fake-wired: features remain functional without these integrations, and integrations are only claimed after actual authorisation and technical integration (see INTEGRATIONS.md).",
+  "slots": [
+    {
+      "id": "supabase_production_db",
+      "name": "Supabase PostgreSQL (production database)",
+      "status": "SLOT READY — awaiting authorised credentials + migration + persistence test",
+      "configKeys": ["DATABASE_PROVIDER=postgres", "DATABASE_URL", "DB_POOL_MAX", "DATABASE_SSL", "DB_REJECT_UNAUTHORIZED"],
+      "steps": [
+        "Set DATABASE_PROVIDER=postgres and DATABASE_URL in the deployment environment",
+        "Run: npm run db:migrate (executes schema.sql against PostgreSQL)",
+        "Run: npm run db:seed (provisions officer/dept-head/admin accounts)",
+        "Verify migration, insert, read, update, transaction, restart, redeploy and persistence before calling the cloud deployment complete"
+      ]
+    },
+    {
+      "id": "bhashini_language_ai",
+      "name": "BHASHINI — Indian-language AI services (speech recognition / translation)",
+      "status": "SLOT READY — awaiting authorisation + API credentials",
+      "configKeys": ["BHASHINI_API_KEY", "BHASHINI_BASE_URL"],
+      "plugInPoint": "lib/i18n.ts (translation resources) and the citizen voice workflow",
+      "notes": "The multilingual framework already renders UI in configured languages with English fallback; BHASHINI extends this to voice-driven complaint filing and department-language delivery."
+    },
+    {
+      "id": "sms_notification",
+      "name": "SMS notifications",
+      "status": "SLOT READY — awaiting provider account",
+      "configKeys": ["SMS_PROVIDER", "SMS_API_KEY", "SMS_SENDER_ID"],
+      "plugInPoint": "lib/notifications dispatch (createNotification currently writes in-app records; SMS is an additive channel)"
+    },
+    {
+      "id": "whatsapp_notification",
+      "name": "WhatsApp Business / authorised government messaging",
+      "status": "SLOT READY — awaiting authorised government messaging account",
+      "configKeys": ["WHATSAPP_TOKEN", "WHATSAPP_PHONE_ID"],
+      "plugInPoint": "lib/notifications dispatch"
+    },
+    {
+      "id": "api_setu",
+      "name": "API Setu — government interoperability (CPGRAMS-related APIs)",
+      "status": "SLOT READY — awaiting authorisation",
+      "configKeys": ["API_SETU_CLIENT_ID", "API_SETU_SECRET"],
+      "plugInPoint": "API layer (/api/*); CivicTrust never claims to replace CPGRAMS — differentiation is evidence verification + location-aware workflow + field resolution verification"
+    },
+    {
+      "id": "government_identity",
+      "name": "Government identity integration (OTP / official identity)",
+      "status": "SLOT READY — awaiting authorisation",
+      "configKeys": ["OTP_PROVIDER_KEY", "GOV_IDENTITY_ENDPOINT"],
+      "plugInPoint": "/api/auth/login and /api/auth/register (current scrypt credential auth remains the baseline)"
+    },
+    {
+      "id": "gis_provider",
+      "name": "GIS provider (production ward maps / field routes)",
+      "status": "SLOT READY — the boundary dataset is already configuration-driven",
+      "configKeys": ["GIS_TILE_URL"],
+      "plugInPoint": "config/jurisdiction.config.json -> deployment.boundaryDataset (point at the next jurisdiction's boundary file)"
+    }
+  ]
+}
