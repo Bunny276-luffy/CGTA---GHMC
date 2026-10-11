@@ -8,6 +8,7 @@ export interface CaptchaVerificationResult {
   score?: number;
   message?: string;
   provider: "turnstile" | "recaptcha" | "none";
+  status?: number;
 }
 
 export async function verifyCaptchaToken(
@@ -19,19 +20,31 @@ export async function verifyCaptchaToken(
     process.env.TURNSTILE_SECRET_KEY ||
     process.env.RECAPTCHA_SECRET_KEY;
 
+  const isProduction = process.env.NODE_ENV === "production";
   const isEnabled = process.env.CAPTCHA_ENABLED === "true";
+  const isDisabledExplicitly = process.env.CAPTCHA_ENABLED === "false";
   const isStrict = process.env.CAPTCHA_STRICT === "true";
 
-  // If CAPTCHA is not configured or disabled, fail-safe gracefully for local dev/pilot
-  if (!secretKey || !isEnabled) {
-    if (isStrict) {
-      return {
-        ok: false,
-        message: "CAPTCHA protection required but unconfigured on server.",
-        provider: "none",
-      };
-    }
+  // Determine if CAPTCHA protection is required:
+  // 1. Running in production environment (always required)
+  // 2. Explicitly enabled via CAPTCHA_ENABLED=true
+  // 3. Explicitly strict via CAPTCHA_STRICT=true
+  // 4. Secret key is configured
+  const isRequired = isProduction || isEnabled || isStrict || Boolean(secretKey);
+
+  // If CAPTCHA is not required and not configured, permit local development/test execution
+  if (!isRequired && (!secretKey || isDisabledExplicitly)) {
     return { ok: true, score: 1.0, provider: "none" };
+  }
+
+  // If CAPTCHA protection is required (or enabled) but secret key is missing, fail-closed safely
+  if (!secretKey) {
+    return {
+      ok: false,
+      message: "Security verification required but unconfigured on server.",
+      provider: "none",
+      status: 500,
+    };
   }
 
   if (!token || typeof token !== "string" || token.trim().length === 0) {
@@ -39,11 +52,16 @@ export async function verifyCaptchaToken(
       ok: false,
       message: "CAPTCHA validation token is missing.",
       provider: "none",
+      status: 400,
     };
   }
 
+  const isTurnstile = Boolean(
+    process.env.TURNSTILE_SECRET_KEY || process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
+  );
+  const provider = isTurnstile ? "turnstile" : "recaptcha";
+
   try {
-    const isTurnstile = Boolean(process.env.TURNSTILE_SECRET_KEY || process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
     const verifyUrl = isTurnstile
       ? "https://challenges.cloudflare.com/turnstile/v0/siteverify"
       : "https://www.google.com/recaptcha/api/siteverify";
@@ -62,30 +80,33 @@ export async function verifyCaptchaToken(
     if (!res.ok) {
       return {
         ok: false,
-        message: `CAPTCHA verification endpoint error: HTTP ${res.status}`,
-        provider: isTurnstile ? "turnstile" : "recaptcha",
+        message: "CAPTCHA verification service temporarily unavailable.",
+        provider,
+        status: 503,
       };
     }
 
-    const data = await res.json();
-    if (data.success) {
+    const data = await res.json().catch(() => ({}) as any);
+    if (data && data.success === true) {
       return {
         ok: true,
         score: typeof data.score === "number" ? data.score : 1.0,
-        provider: isTurnstile ? "turnstile" : "recaptcha",
+        provider,
       };
     }
 
     return {
       ok: false,
       message: "Security check failed. Please refresh and try again.",
-      provider: isTurnstile ? "turnstile" : "recaptcha",
+      provider,
+      status: 400,
     };
-  } catch (err: any) {
+  } catch {
     return {
       ok: false,
-      message: `CAPTCHA verification exception: ${err.message}`,
-      provider: "none",
+      message: "CAPTCHA verification service temporarily unavailable.",
+      provider,
+      status: 503,
     };
   }
 }

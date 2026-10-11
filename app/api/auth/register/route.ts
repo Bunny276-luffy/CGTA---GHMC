@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       });
       return NextResponse.json(
         { message: captchaResult.message || "CAPTCHA verification failed." },
-        { status: 400 }
+        { status: captchaResult.status || 400 }
       );
     }
 

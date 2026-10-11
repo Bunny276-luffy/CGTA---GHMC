@@ -37,7 +37,10 @@ export async function POST(req: Request) {
         severity: "WARNING",
         message: `CAPTCHA validation failed during grievance submit from IP ${ip}`,
       });
-      return NextResponse.json({ message: captchaResult.message || "CAPTCHA verification failed" }, { status: 400 });
+      return NextResponse.json(
+        { message: captchaResult.message || "CAPTCHA verification failed" },
+        { status: captchaResult.status || 400 }
+      );
     }
 
     const title = cleanText(body.title, 200);
