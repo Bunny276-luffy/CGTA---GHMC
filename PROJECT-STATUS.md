@@ -65,6 +65,23 @@ accuracy policy: no capability is claimed beyond what the code demonstrates.
 - Officer resolution integrity: photo + field note + on-site GPS required;
   real server-side geofence delta; outside tolerance → third-party audit.
 
+### Dependency security & audit status (Sprint 2 — Steps A, B1, B2)
+
+- **Next.js & PostCSS Core Updates:** `next` updated to `15.5.27` and direct `postcss` updated to `8.5.29`. Targeted override (`"next": { "postcss": "$postcss" }`) deduplicates Next.js internal PostCSS to the patched root version, eliminating nested PostCSS vulnerabilities.
+- **Protobuf Transitive Override:** `onnx-proto@4.0.4` dependency `protobufjs` overridden to `7.6.6` (`"onnx-proto": { "protobufjs": "7.6.6" }`), resolving transitive prototype pollution advisories. The override successfully decoded model weights and passed the tested ONNX/YOLOS-tiny inference pipeline; universal compatibility across all Protobuf features is not claimed.
+- **Automated Validation Results (Verified):**
+  - **Verification Pipeline (`scripts/test-verification.ts`):** Passed with exit code 0. Verified genuine ONNX weight decoding and execution in Stage 9 (YOLOS-tiny detected `'car'` at 55.6% confidence on a 1024x1024 fixture).
+  - **Evidence Integrity Suite (`scripts/test-evidence-integrity.ts`):** Passed with exit code 0 across all 10 tamper detection, byte-hashing, and coordinate-drift scenarios.
+  - **CAPTCHA Security Suite (`scripts/test-captcha-security.ts`):** Passed with exit code 0 across all 9 core security scenarios and 12 route-level checks.
+  - **Production Build (`npm run build`):** Passed with exit code 0; all 31 routes and edge middleware compiled without type or lint errors.
+- **Residual Audit Findings & Risks (High Severity):**
+  - Two high-severity advisories remain in `sharp <=0.35.5-rc.1` (inherited `libvips`, `libheif`, and `librsvg` vulnerabilities). Reported dependency paths:
+    - `node_modules/@xenova/transformers/node_modules/sharp`
+    - `node_modules/sharp` (via `@xenova/transformers`)
+  - **Exploitability & Remediation Status:** Exploitability assessment and safe remediation remain pending isolated investigation. Upload validation must not be assumed to fully mitigate these underlying image-parsing advisories.
+  - **Dangerous Command Constraint:** `npm audit fix --force` must **not** be used as it forces a breaking downgrade of `@xenova/transformers` to `1.4.2`, which removes ONNX Runtime support and breaks Stage 9 AI image verification.
+  - **Platform Security Posture:** The application is explicitly not claimed to be vulnerability-free or fully production-secure.
+
 ## The 3-layer product
 
 - **Layer 1 — Citizen Trust:** mobile-first reporting, evidence, GPS,
