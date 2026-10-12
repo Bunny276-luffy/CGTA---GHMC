@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRepository } from "../../../../lib/db";
-import { runVerificationPipeline, getCachedVerificationResult } from "../../../../lib/verification-engine";
+import { runVerificationPipeline, matchCachedVerification } from "../../../../lib/verification-engine";
 import { getDepartmentForCategory, evaluateSla } from "../../../../lib/config";
 import { requireAuth, tooManyRequests } from "../../../../lib/api-auth";
 import { rateLimit, getClientIp } from "../../../../lib/rate-limit";
@@ -91,9 +91,14 @@ export async function POST(req: Request) {
     }
 
     // Safe server-side reuse of previously verified result (eliminates double pipeline execution)
-    let verificationResult =
-      (body.verificationToken ? getCachedVerificationResult(body.verificationToken) : null) ||
-      (body.sha256Hash ? getCachedVerificationResult(body.sha256Hash) : null);
+    // Securely matches token against actual submitted photo bytes, category, and coordinates
+    let verificationResult = await matchCachedVerification({
+      token: typeof body.verificationToken === "string" ? body.verificationToken : null,
+      photoBuffer: fileBuffer,
+      category,
+      latitude,
+      longitude
+    });
 
     if (!verificationResult) {
       verificationResult = await runVerificationPipeline({

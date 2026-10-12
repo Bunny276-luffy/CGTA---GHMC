@@ -322,6 +322,8 @@ export interface CachedVerification {
   token: string;
   sha256Hash: string;
   category: string;
+  userLat?: number;
+  userLng?: number;
   result: VerificationResult;
   timestamp: number;
 }
@@ -335,7 +337,12 @@ const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes TTL
  */
 export function cacheVerificationResult(
   result: VerificationResult,
-  context?: { category?: string; description?: string }
+  context?: {
+    category?: string;
+    description?: string;
+    userLat?: number;
+    userLng?: number;
+  }
 ): string {
   const cryptoInst = cryptoModule || (typeof window === "undefined" ? require("crypto") : null);
   const token = cryptoInst
@@ -363,10 +370,15 @@ export function cacheVerificationResult(
     });
   }
 
+  const userLat = context?.userLat !== undefined ? context.userLat : (typeof result.complaintLatitude === "number" ? result.complaintLatitude : undefined);
+  const userLng = context?.userLng !== undefined ? context.userLng : (typeof result.complaintLongitude === "number" ? result.complaintLongitude : undefined);
+
   const entry: CachedVerification = {
     token,
     sha256Hash: result.sha256Hash,
     category: context?.category || "",
+    userLat,
+    userLng,
     result,
     timestamp: now
   };
@@ -376,6 +388,63 @@ export function cacheVerificationResult(
     verificationCache.set(`hash_${result.sha256Hash}`, entry);
   }
   return token;
+}
+
+export interface VerificationMatchOptions {
+  token?: string | null;
+  photoBuffer?: Buffer | Uint8Array | null;
+  category?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+/**
+ * Validates a cached verification result against actual submitted evidence.
+ * Returns the VerificationResult only if token is valid, unexpired, and all
+ * submitted attributes (photo bytes, category, coordinates) match the verification context.
+ */
+export async function matchCachedVerification(options: VerificationMatchOptions): Promise<VerificationResult | null> {
+  if (!options.token || typeof options.token !== "string") return null;
+  const entry = verificationCache.get(options.token);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    verificationCache.delete(options.token);
+    return null;
+  }
+
+  // 1. Verify category match if category was recorded in cache
+  if (entry.category && options.category && entry.category !== options.category) {
+    return null;
+  }
+
+  // 2. Verify image hash match
+  if (entry.sha256Hash) {
+    if (!options.photoBuffer) return null;
+    const submittedHash = await generateFileHash(options.photoBuffer);
+    if (submittedHash !== entry.sha256Hash) {
+      return null;
+    }
+  }
+
+  // 3. Verify coordinates if coordinates were recorded during verification
+  if (
+    typeof entry.userLat === "number" &&
+    typeof entry.userLng === "number" &&
+    typeof options.latitude === "number" &&
+    typeof options.longitude === "number"
+  ) {
+    const dist = calculateHaversineDistance(
+      entry.userLat,
+      entry.userLng,
+      options.latitude,
+      options.longitude
+    );
+    if (dist > gpsTolerance()) {
+      return null;
+    }
+  }
+
+  return entry.result;
 }
 
 /**

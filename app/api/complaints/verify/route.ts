@@ -2,7 +2,15 @@ import { NextResponse } from "next/server";
 import { runVerificationPipeline, cacheVerificationResult } from "../../../../lib/verification-engine";
 import { requireAuth, tooManyRequests } from "../../../../lib/api-auth";
 import { rateLimit, getClientIp } from "../../../../lib/rate-limit";
-import { validatePhotoDataUrl } from "../../../../lib/validation";
+import {
+  cleanText,
+  validateLatitude,
+  validateLongitude,
+  VALID_CATEGORIES,
+  VALID_SEVERITIES,
+} from "../../../../lib/validation";
+import { validateEvidenceUpload } from "../../../../lib/upload-security";
+import { logSystemError } from "../../../../lib/error-logger";
 
 export async function POST(req: Request) {
   const guard = await requireAuth(req, ["CITIZEN", "OFFICER"]);
@@ -15,48 +23,112 @@ export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}) as any);
 
-    let fileBuffer: Buffer | undefined = undefined;
-    if (body.fileData && typeof body.fileData === "string") {
-      const photoCheck = validatePhotoDataUrl(body.fileData);
-      if (!photoCheck.ok) {
+    // Validate category if provided
+    let category: string | undefined = undefined;
+    if (body.category !== undefined) {
+      if (typeof body.category !== "string" || !VALID_CATEGORIES.includes(body.category as any)) {
         return NextResponse.json(
-          { error: "Verification rejected", message: photoCheck.error },
+          { message: "Invalid grievance category." },
           { status: 400 }
         );
       }
-      const base64Data = body.fileData.split(",")[1];
-      if (base64Data) {
-        fileBuffer = Buffer.from(base64Data, "base64");
+      category = body.category;
+    }
+
+    // Validate severity if provided
+    let severity: string | undefined = undefined;
+    if (body.severity !== undefined) {
+      if (typeof body.severity !== "string" || !VALID_SEVERITIES.includes(body.severity as any)) {
+        return NextResponse.json(
+          { message: "Invalid grievance severity level." },
+          { status: 400 }
+        );
       }
+      severity = body.severity;
+    }
+
+    // Validate user complaint coordinates if provided
+    let userLat: number | undefined = undefined;
+    let userLng: number | undefined = undefined;
+    if (body.userLat !== undefined || body.userLng !== undefined) {
+      if (!validateLatitude(body.userLat) || !validateLongitude(body.userLng)) {
+        return NextResponse.json(
+          { message: "Valid GPS coordinates are required." },
+          { status: 400 }
+        );
+      }
+      userLat = body.userLat;
+      userLng = body.userLng;
+    }
+
+    // Validate device / EXIF coordinates if provided (do not substitute user coordinates)
+    let deviceLat: number | undefined = undefined;
+    let deviceLng: number | undefined = undefined;
+    const rawDeviceLat = body.deviceLat !== undefined ? body.deviceLat : body.exifLat;
+    const rawDeviceLng = body.deviceLng !== undefined ? body.deviceLng : body.exifLng;
+    if (rawDeviceLat !== undefined || rawDeviceLng !== undefined) {
+      if (!validateLatitude(rawDeviceLat) || !validateLongitude(rawDeviceLng)) {
+        return NextResponse.json(
+          { message: "Valid device GPS coordinates are required." },
+          { status: 400 }
+        );
+      }
+      deviceLat = rawDeviceLat;
+      deviceLng = rawDeviceLng;
+    }
+
+    let fileBuffer: Buffer | undefined = undefined;
+    let computedFileSize: number | undefined = typeof body.fileSize === "number" ? body.fileSize : undefined;
+    let safeFileName = typeof body.fileName === "string" ? body.fileName.slice(0, 200) : "evidence_photo.jpg";
+
+    if (body.fileData && typeof body.fileData === "string") {
+      const uploadCheck = validateEvidenceUpload(body.fileData, body.fileName);
+      if (!uploadCheck.ok) {
+        return NextResponse.json(
+          { message: uploadCheck.error },
+          { status: 400 }
+        );
+      }
+      fileBuffer = uploadCheck.buffer;
+      computedFileSize = uploadCheck.sizeBytes || fileBuffer?.length;
+      safeFileName = uploadCheck.safeFileName || safeFileName;
     }
 
     const verificationResult = await runVerificationPipeline({
-      fileName: typeof body.fileName === "string" ? body.fileName.slice(0, 200) : undefined,
-      fileSize: typeof body.fileSize === "number" ? body.fileSize : undefined,
-      fileType: typeof body.fileType === "string" ? body.fileType.slice(0, 100) : undefined,
-      category: typeof body.category === "string" ? body.category.slice(0, 100) : undefined,
-      description: typeof body.description === "string" ? body.description.slice(0, 2000) : undefined,
-      address: typeof body.address === "string" ? body.address.slice(0, 300) : undefined,
-      userLat: typeof body.userLat === "number" ? body.userLat : undefined,
-      userLng: typeof body.userLng === "number" ? body.userLng : undefined,
-      deviceLat: typeof body.userLat === "number" ? body.userLat : undefined,
-      deviceLng: typeof body.userLng === "number" ? body.userLng : undefined,
+      fileName: safeFileName,
+      fileSize: computedFileSize || (fileBuffer ? fileBuffer.length : 245000),
+      fileType: "image/jpeg",
+      category: category || "",
+      description: typeof body.description === "string" ? cleanText(body.description, 2000) || "" : "",
+      address: typeof body.address === "string" ? cleanText(body.address, 300) || undefined : undefined,
+      userLat,
+      userLng,
+      deviceLat,
+      deviceLng,
       fileLastModified: typeof body.fileLastModified === "number" ? body.fileLastModified : undefined,
       fileData: fileBuffer,
-      severity: typeof body.severity === "string" ? body.severity.slice(0, 20) : undefined
+      severity
     });
 
     // Cache the verified result server-side to prevent redundant execution at submit time
     const token = cacheVerificationResult(verificationResult, {
-      category: typeof body.category === "string" ? body.category : "",
-      description: typeof body.description === "string" ? body.description : ""
+      category: category || "",
+      description: typeof body.description === "string" ? body.description : "",
+      userLat,
+      userLng
     });
     verificationResult.verificationToken = token;
 
     return NextResponse.json(verificationResult);
   } catch (err: any) {
+    await logSystemError({
+      area: "VERIFICATION",
+      endpoint: "/api/complaints/verify",
+      severity: "ERROR",
+      message: `Verification processing failed: ${err.message}`,
+    });
     return NextResponse.json(
-      { error: "Verification failed", message: err.message },
+      { message: "Verification processing failed. Please check the file and try again." },
       { status: 500 }
     );
   }
