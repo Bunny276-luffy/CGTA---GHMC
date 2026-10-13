@@ -101,8 +101,8 @@ export async function PATCH(
       options.assignedOfficerId = body.assignedOfficerId;
     }
   } else if (role === "OFFICER") {
-    // Object-Level Authorization: Officer must be assigned to this ticket (or taking an unassigned ticket)
-    if (complaint.assigned_officer_id && complaint.assigned_officer_id !== session.id) {
+    // Object-Level Authorization: Officers may change status only for complaints assigned to their account.
+    if (!complaint.assigned_officer_id || complaint.assigned_officer_id !== session.id) {
       return NextResponse.json(
         { message: "Forbidden: you may only manage complaints assigned to your officer account." },
         { status: 403 }
