@@ -18,6 +18,8 @@ declare global {
   var __civictrust_pg_pool__: Pool | undefined;
 }
 
+let poolInstance: Pool | null = null;
+
 function getPoolConfig(): PoolConfig {
   const connectionString = process.env.DATABASE_URL;
   const isProduction = process.env.NODE_ENV === "production";
@@ -42,8 +44,13 @@ function getPoolConfig(): PoolConfig {
 }
 
 export function getPool(): Pool {
+  if (poolInstance) {
+    return poolInstance;
+  }
+
   if (global.__civictrust_pg_pool__) {
-    return global.__civictrust_pg_pool__;
+    poolInstance = global.__civictrust_pg_pool__;
+    return poolInstance;
   }
 
   const config = getPoolConfig();
@@ -53,11 +60,31 @@ export function getPool(): Pool {
     console.error("Unexpected error on idle PostgreSQL client pool:", err.message);
   });
 
+  poolInstance = pool;
   if (process.env.NODE_ENV !== "production") {
     global.__civictrust_pg_pool__ = pool;
   }
 
-  return pool;
+  return poolInstance;
+}
+
+/**
+ * Resets and terminates the active PostgreSQL connection pool.
+ * Idempotent: ensures the same pool is not closed twice.
+ * Only resets resources created or managed by this module.
+ */
+export async function resetPool(): Promise<void> {
+  const poolToClose = poolInstance || global.__civictrust_pg_pool__;
+  poolInstance = null;
+  global.__civictrust_pg_pool__ = undefined;
+
+  if (poolToClose && !poolToClose.ending && !poolToClose.ended) {
+    try {
+      await poolToClose.end();
+    } catch {
+      // Ignore if pool is already ending or ended
+    }
+  }
 }
 
 export class PostgresRepository implements DatabaseRepository {
