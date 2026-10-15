@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getRepository } from "../../../../../lib/db";
 import { requireAuth, tooManyRequests } from "../../../../../lib/api-auth";
 import { rateLimit, getClientIp } from "../../../../../lib/rate-limit";
-import { VALID_STATUSES, cleanText, validatePhotoDataUrl, validateLatitude, validateLongitude } from "../../../../../lib/validation";
+import { VALID_STATUSES, cleanText, validateLatitude, validateLongitude } from "../../../../../lib/validation";
+import { validateEvidenceUpload } from "../../../../../lib/upload-security";
 import { haversineMeters, gpsToleranceMeters } from "../../../../../lib/geo";
 import { Complaint } from "../../../../../lib/repositories/types";
 
@@ -77,6 +78,7 @@ export async function PATCH(
   const notes = cleanText(body.notes ?? "", 500);
   let geofenceReport: { distanceMeters: number; toleranceMeters: number; withinTolerance: boolean } | null = null;
   let statusToApply = nextStatus;
+  let resolutionEvidenceMeta: { mimeType: string; sizeBytes: number } | null = null;
 
   // ---- Role & transition authorization -------------------------------------
   if (role === "ADMIN" || role === "DEPT_HEAD") {
@@ -120,10 +122,20 @@ export async function PATCH(
 
     if (nextStatus === "RESOLVED") {
       // Resolution requires proof: photo + on-site GPS + field note. Fail closed.
-      const photoCheck = validatePhotoDataUrl(body.resolutionPhotoUrl);
-      if (!photoCheck.ok) {
-        return NextResponse.json({ message: photoCheck.error }, { status: 400 });
+      if (typeof body.resolutionPhotoUrl !== "string" || !body.resolutionPhotoUrl) {
+        return NextResponse.json(
+          { message: "Photo evidence must be an image data URL" },
+          { status: 400 }
+        );
       }
+      const uploadCheck = validateEvidenceUpload(body.resolutionPhotoUrl);
+      if (!uploadCheck.ok || !uploadCheck.mimeType || typeof uploadCheck.sizeBytes !== "number") {
+        return NextResponse.json({ message: uploadCheck.error || "Invalid photo payload" }, { status: 400 });
+      }
+      resolutionEvidenceMeta = {
+        mimeType: uploadCheck.mimeType,
+        sizeBytes: uploadCheck.sizeBytes,
+      };
       if (!notes || notes.length < 10) {
         return NextResponse.json(
           { message: "A field action note (min 10 characters) is required to resolve." },
@@ -185,13 +197,12 @@ export async function PATCH(
     await repo.updateComplaintStatus(complaintId, statusToApply, options);
 
     // Resolution evidence is also recorded in the evidence ledger.
-    if (options.resolutionPhotoUrl) {
+    if (options.resolutionPhotoUrl && resolutionEvidenceMeta) {
       try {
-        const byteSize = Math.floor(((options.resolutionPhotoUrl.split(",")[1] || "").length * 3) / 4);
         await repo.createComplaintEvidence(complaintId, {
           file_url: options.resolutionPhotoUrl,
-          file_type: "image/jpeg",
-          size_bytes: byteSize,
+          file_type: resolutionEvidenceMeta.mimeType,
+          size_bytes: resolutionEvidenceMeta.sizeBytes,
           metadata: JSON.stringify({
             kind: "resolution",
             officerLat: body.officerLat ?? null,
