@@ -110,7 +110,7 @@ export class PostgresRepository implements DatabaseRepository {
   }
 
   async createComplaint(
-    complaint: Omit<Complaint, 'id' | 'created_at' | 'updated_at' | 'tracking_id'>,
+    complaint: Omit<Complaint, 'id' | 'created_at' | 'updated_at' | 'tracking_id' | 'status'> & { status?: string },
     evidence?: Omit<Evidence, 'id' | 'complaint_id' | 'uploaded_at'>
   ): Promise<Complaint> {
     const pool = getPool();
@@ -125,17 +125,19 @@ export class PostgresRepository implements DatabaseRepository {
           await client.query("BEGIN");
 
           const tracking_id = `CGTA-${new Date().getFullYear()}-${randomBytes(3).toString('hex').toUpperCase().slice(0, 6)}`;
+          const status = complaint.status || 'SUBMITTED';
 
           const compRes = await client.query(
             `INSERT INTO complaints
-              (tracking_id, title, description, category, latitude, longitude, address, severity, anonymous, before_photo_url, created_by_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+              (tracking_id, title, description, category, status, latitude, longitude, address, severity, anonymous, before_photo_url, created_by_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
              RETURNING *`,
             [
               tracking_id,
               complaint.title,
               complaint.description,
               complaint.category,
+              status,
               complaint.latitude,
               complaint.longitude,
               complaint.address,

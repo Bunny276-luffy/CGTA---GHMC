@@ -113,7 +113,7 @@ export interface DatabaseRepository {
   createUser(user: Omit<User, 'id' | 'created_at' | 'updated_at'>): Promise<User>;
   
   // Complaints
-  createComplaint(complaint: Omit<Complaint, 'id' | 'created_at' | 'updated_at' | 'tracking_id'>, evidence?: Omit<Evidence, 'id' | 'complaint_id' | 'uploaded_at'>): Promise<Complaint>;
+  createComplaint(complaint: Omit<Complaint, 'id' | 'created_at' | 'updated_at' | 'tracking_id' | 'status'> & { status?: string }, evidence?: Omit<Evidence, 'id' | 'complaint_id' | 'uploaded_at'>): Promise<Complaint>;
   getComplaintByTrackingId(trackingId: string): Promise<Complaint | null>;
   getComplaintById(complaintId: string): Promise<Complaint | null>;
   getComplaintsByUserId(userId: string): Promise<Complaint[]>;

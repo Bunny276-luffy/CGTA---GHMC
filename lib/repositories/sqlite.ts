@@ -60,15 +60,16 @@ export class SQLiteRepository implements DatabaseRepository {
   }
 
   async createComplaint(
-    complaint: Omit<Complaint, 'id' | 'created_at' | 'updated_at' | 'tracking_id'>,
+    complaint: Omit<Complaint, 'id' | 'created_at' | 'updated_at' | 'tracking_id' | 'status'> & { status?: string },
     evidence?: Omit<Evidence, 'id' | 'complaint_id' | 'uploaded_at'>
   ): Promise<Complaint> {
     const db = getDb();
+    const status = complaint.status || 'SUBMITTED';
 
     const insertComplaint = db.prepare(`
       INSERT INTO complaints
-        (id, tracking_id, title, description, category, latitude, longitude, address, severity, anonymous, before_photo_url, created_by_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, tracking_id, title, description, category, status, latitude, longitude, address, severity, anonymous, before_photo_url, created_by_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertEvidence = db.prepare(`
@@ -94,6 +95,7 @@ export class SQLiteRepository implements DatabaseRepository {
           complaint.title,
           complaint.description,
           complaint.category,
+          status,
           complaint.latitude,
           complaint.longitude,
           complaint.address,
@@ -117,7 +119,7 @@ export class SQLiteRepository implements DatabaseRepository {
 
       try {
         transaction();
-        return { ...complaint, id, tracking_id } as Complaint;
+        return { ...complaint, id, tracking_id, status } as Complaint;
       } catch (err: any) {
         lastError = err;
         // Retry only on a tracking-ID uniqueness collision; rethrow anything else.
