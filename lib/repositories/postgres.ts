@@ -281,7 +281,7 @@ export class PostgresRepository implements DatabaseRepository {
         report.duplicate_detected || false,
         report.duplicate_parent_id || null,
         report.forgery_score || 0.0,
-        report.trust_score || 100.0,
+        report.trust_score ?? 100.0,
         report.explainable_report || null,
         report.priority_predicted || 'STANDARD',
         report.image_sha256 || null,

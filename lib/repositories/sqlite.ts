@@ -209,6 +209,7 @@ export class SQLiteRepository implements DatabaseRepository {
 
   async createAIReport(report: Omit<AIReport, 'id' | 'checked_at'>): Promise<AIReport> {
     const id = randomUUID();
+    const trustScore = report.trust_score ?? 100.0;
     const stmt = getDb().prepare(`
       INSERT INTO ai_reports 
         (id, complaint_id, exif_data, duplicate_detected, duplicate_parent_id, forgery_score, trust_score, explainable_report, priority_predicted, image_sha256, image_phash)
@@ -222,14 +223,14 @@ export class SQLiteRepository implements DatabaseRepository {
       report.duplicate_detected ? 1 : 0,
       report.duplicate_parent_id || null,
       report.forgery_score || 0.0,
-      report.trust_score || 100.0,
+      trustScore,
       report.explainable_report || null,
       report.priority_predicted || 'STANDARD',
       report.image_sha256 || null,
       report.image_phash || null
     );
 
-    return { ...report, id } as AIReport;
+    return { ...report, id, trust_score: trustScore } as AIReport;
   }
 
   async getAIReportByComplaintId(complaintId: string): Promise<AIReport | null> {
