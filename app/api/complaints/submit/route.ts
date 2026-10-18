@@ -146,7 +146,7 @@ export async function POST(req: Request) {
           anonymous,
           before_photo_url: photoDataUrl ?? undefined,
           created_by_id: createdById,
-          status: trustScore >= 60.0 ? "SUBMITTED" : "TPA_REVIEW"
+          status: (trustScore >= 60.0 && verificationResult.duplicateType !== "UNAVAILABLE") ? "SUBMITTED" : "TPA_REVIEW"
         }
       );
 

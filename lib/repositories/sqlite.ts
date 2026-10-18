@@ -239,6 +239,22 @@ export class SQLiteRepository implements DatabaseRepository {
     return row || null;
   }
 
+  async getAIReportByImageSha256(imageSha256: string): Promise<AIReport | null> {
+    if (!imageSha256 || typeof imageSha256 !== 'string' || !imageSha256.trim()) {
+      return null;
+    }
+    const stmt = getDb().prepare('SELECT * FROM ai_reports WHERE image_sha256 = ? LIMIT 1');
+    const row = stmt.get(imageSha256.trim()) as AIReport | undefined;
+    return row || null;
+  }
+
+  async getAIReportsWithPHash(): Promise<Array<{ complaint_id: string; image_phash: string }>> {
+    const stmt = getDb().prepare(
+      'SELECT complaint_id, image_phash FROM ai_reports WHERE image_phash IS NOT NULL AND length(image_phash) = 16'
+    );
+    return stmt.all() as Array<{ complaint_id: string; image_phash: string }>;
+  }
+
   async createComplaintEvidence(
     complaintId: string,
     evidence: { file_url: string; file_type: string; size_bytes: number; metadata?: string }

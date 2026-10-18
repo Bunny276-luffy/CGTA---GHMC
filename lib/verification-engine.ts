@@ -1322,37 +1322,54 @@ export async function runVerificationPipeline(input: VerificationInput): Promise
 
       let matchedRecord: { complaint_id: string; type: "EXACT" | "NEAR"; distance?: number } | null = null;
 
-      // 1. Database connection check
-      const hasDbUrl = process.env.DATABASE_URL && process.env.DATABASE_URL.trim().length > 0;
-      if (typeof window === "undefined" && hasDbUrl) {
-        try {
-          const provider = process.env.DATABASE_PROVIDER || "sqlite";
-          let exactRes: { rowCount?: number; rows: any[] } = { rowCount: 0, rows: [] };
-          let nearResRows: any[] = [];
+      // 1. In-memory duplicate detection against provided historical records (e.g. for unit tests)
+      if (Array.isArray(input.historicalRecords)) {
+        const exactMatch = input.historicalRecords.find(r => r.image_sha256 === sha256Hash);
+        if (exactMatch) {
+          matchedRecord = {
+            complaint_id: exactMatch.complaint_id,
+            type: "EXACT"
+          };
+        } else if (currentPhash && currentPhash.length === 16) {
+          let bestDistance = 64;
+          let bestParentId: string | null = null;
 
-          if (provider === "postgres") {
-            const { getPool } = require("./repositories/postgres");
-            const pool = getPool();
-            const res = await pool.query(
-              "SELECT complaint_id FROM ai_reports WHERE image_sha256 = $1 LIMIT 1",
-              [sha256Hash]
-            );
-            exactRes = { rowCount: res.rowCount || res.rows.length, rows: res.rows };
-
-            if (!exactRes.rowCount) {
-              const resNear = await pool.query(
-                "SELECT complaint_id, image_phash FROM ai_reports WHERE image_phash IS NOT NULL"
-              );
-              nearResRows = resNear.rows;
+          for (const rec of input.historicalRecords) {
+            if (rec.image_phash && rec.image_phash.length === 16) {
+              const dist = calculateHammingDistance(rec.image_phash, currentPhash);
+              if (dist < bestDistance) {
+                bestDistance = dist;
+                bestParentId = rec.complaint_id;
+              }
             }
           }
 
-          if (exactRes.rowCount && exactRes.rowCount > 0) {
+          if (bestDistance <= DEFAULT_DHASH_DISTANCE_THRESHOLD && bestParentId) {
             matchedRecord = {
-              complaint_id: exactRes.rows[0].complaint_id,
-              type: "EXACT"
+              complaint_id: bestParentId,
+              type: "NEAR",
+              distance: bestDistance
             };
-          } else if (nearResRows.length > 0) {
+          }
+        }
+      } else if (typeof window === "undefined") {
+        // 2. Database lookup using shared repository abstraction (SQLite or PostgreSQL)
+        try {
+          const { getRepository } = require("./db");
+          const repo = getRepository();
+
+          if (sha256Hash) {
+            const exactReport = await repo.getAIReportByImageSha256(sha256Hash);
+            if (exactReport && exactReport.complaint_id) {
+              matchedRecord = {
+                complaint_id: exactReport.complaint_id,
+                type: "EXACT"
+              };
+            }
+          }
+
+          if (!matchedRecord && currentPhash && currentPhash.length === 16) {
+            const nearResRows = await repo.getAIReportsWithPHash();
             let bestDistance = 64;
             let bestParentId: string | null = null;
 
@@ -1375,48 +1392,11 @@ export async function runVerificationPipeline(input: VerificationInput): Promise
             }
           }
         } catch (dbErr: any) {
-          // If PG is unreachable/fails, fall back to historicalRecords array if supplied (for tests)
-          if (!input.historicalRecords) {
-            duplicateDetected = false;
-            duplicateType = "UNAVAILABLE";
-            duplicateParentId = null;
-            duplicateSimilarity = 0.0;
-            duplicateDescription = `Database lookup failed: ${dbErr.message}`;
-          }
-        }
-      }
-
-      // 2. Fallback to passed historicalRecords if DB was not reachable / failed, and historicalRecords is provided
-      if (!matchedRecord && input.historicalRecords && input.historicalRecords.length > 0) {
-        // Exact SHA-256 check
-        const exactMatch = input.historicalRecords.find(r => r.image_sha256 === sha256Hash);
-        if (exactMatch) {
-          matchedRecord = {
-            complaint_id: exactMatch.complaint_id,
-            type: "EXACT"
-          };
-        } else {
-          // dHash check
-          let bestDistance = 64;
-          let bestParentId: string | null = null;
-
-          for (const rec of input.historicalRecords) {
-            if (rec.image_phash && rec.image_phash.length === 16) {
-              const dist = calculateHammingDistance(rec.image_phash, currentPhash);
-              if (dist < bestDistance) {
-                bestDistance = dist;
-                bestParentId = rec.complaint_id;
-              }
-            }
-          }
-
-          if (bestDistance <= DEFAULT_DHASH_DISTANCE_THRESHOLD && bestParentId) {
-            matchedRecord = {
-              complaint_id: bestParentId,
-              type: "NEAR",
-              distance: bestDistance
-            };
-          }
+          duplicateDetected = false;
+          duplicateType = "UNAVAILABLE";
+          duplicateParentId = null;
+          duplicateSimilarity = 0.0;
+          duplicateDescription = `Database lookup failed: ${dbErr?.message || String(dbErr)}`;
         }
       }
 
@@ -1758,6 +1738,11 @@ export async function runVerificationPipeline(input: VerificationInput): Promise
       trustScore = Math.min(35, trustScore);
       trustGrade = "SUSPICIOUS";
       trustClassification = "SUSPICIOUS";
+    } else if (duplicateType === "UNAVAILABLE") {
+      // Fail-safe: unverified duplicate status prevents auto-admission (threshold: 60.0)
+      trustScore = Math.min(55, trustScore);
+      trustGrade = trustScore >= 45 ? "MODERATE_TRUST" : "SUSPICIOUS";
+      trustClassification = trustGrade;
     } else {
       if (trustScore >= 75) {
         trustGrade = "HIGH_TRUST";
@@ -1782,6 +1767,7 @@ export async function runVerificationPipeline(input: VerificationInput): Promise
     let detailStr = deductions.length > 0 ? `Deductions: ${deductions.join(", ")}.` : "All integrity checks passed.";
     if (manipulationDetected) detailStr += " [CAPPED: Critical manipulation signature found.]";
     if (isDuplicate) detailStr += " [CAPPED: Duplicate image flagged.]";
+    if (duplicateType === "UNAVAILABLE") detailStr += " [CAPPED: Duplicate verification unavailable.]";
 
     trustExplanation = `Score: ${trustScore}/100 (${trustGrade}). ${detailStr}`;
   } else {

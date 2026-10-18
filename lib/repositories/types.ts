@@ -137,6 +137,8 @@ export interface DatabaseRepository {
   // AI Reports
   createAIReport(report: Omit<AIReport, 'id' | 'checked_at'>): Promise<AIReport>;
   getAIReportByComplaintId(complaintId: string): Promise<AIReport | null>;
+  getAIReportByImageSha256(imageSha256: string): Promise<AIReport | null>;
+  getAIReportsWithPHash(): Promise<Array<{ complaint_id: string; image_phash: string }>>;
   getEvidenceByComplaintId(complaintId: string): Promise<Evidence | null>;
   createComplaintEvidence(
     complaintId: string,
