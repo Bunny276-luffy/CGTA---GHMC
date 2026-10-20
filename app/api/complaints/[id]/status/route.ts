@@ -21,7 +21,6 @@ const OFFICER_TRANSITIONS: Record<string, string[]> = {
   ASSIGNED: ["IN_PROGRESS", "TPA_REVIEW"],
   IN_PROGRESS: ["RESOLVED", "TPA_REVIEW"],
   SUBMITTED: ["TPA_REVIEW"],
-  TPA_REVIEW: ["IN_PROGRESS"],
 };
 
 const CITIZEN_TRANSITIONS: Record<string, string[]> = {

@@ -173,6 +173,41 @@ async function runStatusAuthRegressionTests() {
     assert.strictEqual(data1B.geofence?.withinTolerance, true, "Geofence verification must succeed");
     console.log("✅ 1B Passed: Assigned officer successfully resolves IN_PROGRESS ticket with valid proof");
 
+    // 1C: Officer 101 attempts to transition assigned ticket from TPA_REVIEW to IN_PROGRESS
+    complaintsTable.set("ticket-assigned-tpa", {
+      id: "ticket-assigned-tpa",
+      tracking_id: "CGTA-2026-TPA1",
+      title: "Contaminated Water Supply",
+      description: "Discolored water reported in ward 12",
+      category: "WATER",
+      status: "TPA_REVIEW",
+      latitude: 17.385,
+      longitude: 78.486,
+      address: "Ward 12, Hyderabad",
+      severity: "EMERGENCY",
+      anonymous: false,
+      created_by_id: "citizen-1",
+      assigned_officer_id: "officer-101",
+    });
+
+    const req1C = new Request("http://localhost:3000/api/complaints/ticket-assigned-tpa/status", {
+      method: "PATCH",
+      headers: officer1Headers,
+      body: JSON.stringify({
+        status: "IN_PROGRESS",
+        notes: "Officer attempts unilateral de-escalation of TPA_REVIEW ticket",
+      }),
+    });
+    const res1C = await statusHandler(req1C, { params: Promise.resolve({ id: "ticket-assigned-tpa" }) });
+    assert.strictEqual(res1C.status, 403, "Assigned officer attempting to move TPA_REVIEW -> IN_PROGRESS must receive 403");
+    const data1C = await res1C.json();
+    assert.strictEqual(
+      data1C.message,
+      "Forbidden: officers cannot move a ticket from TPA_REVIEW to IN_PROGRESS.",
+      "Rejection message must indicate officers cannot move out of TPA_REVIEW"
+    );
+    console.log("✅ 1C Passed: Assigned officer received 403 when attempting to move assigned complaint from TPA_REVIEW to IN_PROGRESS");
+
     // -------------------------------------------------------------------------
     // TEST 2: Unassigned Complaint — Officer receives 403 Forbidden
     // -------------------------------------------------------------------------
@@ -424,6 +459,69 @@ async function runStatusAuthRegressionTests() {
     const res4C = await statusHandler(req4C, { params: Promise.resolve({ id: "ticket-gov-1" }) });
     assert.strictEqual(res4C.status, 200, "ADMIN administrative closure must succeed with 200");
     console.log("✅ 4C Passed: ADMIN successfully closes complaint");
+
+    // 4D: DEPT_HEAD moves complaint from TPA_REVIEW to IN_PROGRESS with officer assignment
+    complaintsTable.set("ticket-gov-3", {
+      id: "ticket-gov-3",
+      tracking_id: "CGTA-2026-GOV3",
+      title: "Sewer Line Overflow",
+      description: "Audit review completed; remedial work ordered",
+      category: "DRAINAGE",
+      status: "TPA_REVIEW",
+      latitude: 17.43,
+      longitude: 78.41,
+      address: "Drainage Lane, Hyderabad",
+      severity: "HIGH",
+      anonymous: false,
+      created_by_id: "citizen-1",
+      assigned_officer_id: "officer-101",
+    });
+
+    const req4D = new Request("http://localhost:3000/api/complaints/ticket-gov-3/status", {
+      method: "PATCH",
+      headers: deptHeadHeaders,
+      body: JSON.stringify({
+        status: "IN_PROGRESS",
+        assignedOfficerId: "officer-101",
+        notes: "Supervisor concluded audit review and authorized remedial action",
+      }),
+    });
+    const res4D = await statusHandler(req4D, { params: Promise.resolve({ id: "ticket-gov-3" }) });
+    assert.strictEqual(res4D.status, 200, "DEPT_HEAD moving TPA_REVIEW complaint to IN_PROGRESS must return 200");
+    const data4D = await res4D.json();
+    assert.strictEqual(data4D.complaint?.status, "IN_PROGRESS", "Complaint status must be updated to IN_PROGRESS");
+    console.log("✅ 4D Passed: DEPT_HEAD successfully transitions TPA_REVIEW complaint to IN_PROGRESS");
+
+    // 4E: ADMIN moves complaint from TPA_REVIEW directly to CLOSED
+    complaintsTable.set("ticket-gov-4", {
+      id: "ticket-gov-4",
+      tracking_id: "CGTA-2026-GOV4",
+      title: "Commercial Noise Dispute",
+      description: "Escalated for administrative adjudication",
+      category: "GENERAL",
+      status: "TPA_REVIEW",
+      latitude: 17.44,
+      longitude: 78.47,
+      address: "Commercial Zone, Hyderabad",
+      severity: "STANDARD",
+      anonymous: false,
+      created_by_id: "citizen-1",
+      assigned_officer_id: undefined,
+    });
+
+    const req4E = new Request("http://localhost:3000/api/complaints/ticket-gov-4/status", {
+      method: "PATCH",
+      headers: adminHeaders,
+      body: JSON.stringify({
+        status: "CLOSED",
+        notes: "Administrative determination rendered and grievance closed by governance office",
+      }),
+    });
+    const res4E = await statusHandler(req4E, { params: Promise.resolve({ id: "ticket-gov-4" }) });
+    assert.strictEqual(res4E.status, 200, "ADMIN moving TPA_REVIEW complaint to CLOSED must return 200");
+    const data4E = await res4E.json();
+    assert.strictEqual(data4E.complaint?.status, "CLOSED", "Complaint status must be updated to CLOSED");
+    console.log("✅ 4E Passed: ADMIN successfully closes TPA_REVIEW complaint");
 
     // -------------------------------------------------------------------------
     // TEST 5: Citizen Ownership Restrictions Unchanged
