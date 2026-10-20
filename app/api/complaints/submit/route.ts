@@ -97,7 +97,8 @@ export async function POST(req: Request) {
       photoBuffer: fileBuffer,
       category,
       latitude,
-      longitude
+      longitude,
+      consume: true
     });
 
     if (!verificationResult) {
@@ -131,6 +132,7 @@ export async function POST(req: Request) {
 
     let complaintId = "";
     let realTrackingId = "";
+    let complaintStatus = "";
     try {
       const repo = getRepository();
 
@@ -152,6 +154,7 @@ export async function POST(req: Request) {
 
       complaintId = newComplaint.id;
       realTrackingId = newComplaint.tracking_id;
+      complaintStatus = newComplaint.status;
 
       await repo.createAIReport({
         complaint_id: complaintId,
@@ -192,7 +195,7 @@ export async function POST(req: Request) {
         id: complaintId,
         trackingId: realTrackingId,
         title,
-        status: trustScore >= 60.0 ? "SUBMITTED" : "TPA_REVIEW",
+        status: complaintStatus || ((trustScore >= 60.0 && verificationResult.duplicateType !== "UNAVAILABLE") ? "SUBMITTED" : "TPA_REVIEW"),
         trustScore,
         suggestedDepartment: routedDepartment ? routedDepartment.name : null,
         sla,

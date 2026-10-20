@@ -326,6 +326,8 @@ export interface CachedVerification {
   userLng?: number;
   result: VerificationResult;
   timestamp: number;
+  inUse?: boolean;
+  consumed?: boolean;
 }
 
 const verificationCache = new Map<string, CachedVerification>();
@@ -380,7 +382,9 @@ export function cacheVerificationResult(
     userLat,
     userLng,
     result,
-    timestamp: now
+    timestamp: now,
+    inUse: false,
+    consumed: false
   };
 
   verificationCache.set(token, entry);
@@ -396,55 +400,90 @@ export interface VerificationMatchOptions {
   category?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  consume?: boolean;
 }
 
 /**
  * Validates a cached verification result against actual submitted evidence.
  * Returns the VerificationResult only if token is valid, unexpired, and all
  * submitted attributes (photo bytes, category, coordinates) match the verification context.
+ *
+ * When `consume` is true (default), token consumption is single-use and atomic within
+ * the application execution model to prevent replay attacks and duplicate submission bypass.
  */
 export async function matchCachedVerification(options: VerificationMatchOptions): Promise<VerificationResult | null> {
   if (!options.token || typeof options.token !== "string") return null;
   const entry = verificationCache.get(options.token);
   if (!entry) return null;
+  if (entry.consumed) return null;
+
   if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
     verificationCache.delete(options.token);
+    if (entry.sha256Hash) {
+      verificationCache.delete(`hash_${entry.sha256Hash}`);
+    }
     return null;
   }
 
-  // 1. Verify category match if category was recorded in cache
-  if (entry.category && options.category && entry.category !== options.category) {
-    return null;
+  const shouldConsume = options.consume !== false;
+  if (entry.inUse) return null;
+
+  if (shouldConsume) {
+    entry.inUse = true;
   }
 
-  // 2. Verify image hash match
-  if (entry.sha256Hash) {
-    if (!options.photoBuffer) return null;
-    const submittedHash = await generateFileHash(options.photoBuffer);
-    if (submittedHash !== entry.sha256Hash) {
+  let matched = false;
+  try {
+    // 1. Verify category match if category was recorded in cache
+    if (entry.category && options.category && entry.category !== options.category) {
       return null;
     }
-  }
 
-  // 3. Verify coordinates if coordinates were recorded during verification
-  if (
-    typeof entry.userLat === "number" &&
-    typeof entry.userLng === "number" &&
-    typeof options.latitude === "number" &&
-    typeof options.longitude === "number"
-  ) {
-    const dist = calculateHaversineDistance(
-      entry.userLat,
-      entry.userLng,
-      options.latitude,
-      options.longitude
-    );
-    if (dist > gpsTolerance()) {
-      return null;
+    // 2. Verify image hash match
+    if (entry.sha256Hash) {
+      if (!options.photoBuffer) return null;
+      const submittedHash = await generateFileHash(options.photoBuffer);
+      if (submittedHash !== entry.sha256Hash) {
+        return null;
+      }
+    }
+
+    // 3. Verify coordinates if coordinates were recorded during verification
+    if (
+      typeof entry.userLat === "number" &&
+      typeof entry.userLng === "number" &&
+      typeof options.latitude === "number" &&
+      typeof options.longitude === "number"
+    ) {
+      const dist = calculateHaversineDistance(
+        entry.userLat,
+        entry.userLng,
+        options.latitude,
+        options.longitude
+      );
+      if (dist > gpsTolerance()) {
+        return null;
+      }
+    }
+
+    matched = true;
+    if (shouldConsume) {
+      entry.consumed = true;
+      verificationCache.delete(entry.token);
+      if (entry.sha256Hash) {
+        verificationCache.delete(`hash_${entry.sha256Hash}`);
+      }
+      if (options.token !== entry.token) {
+        verificationCache.delete(options.token);
+      }
+    }
+
+    return entry.result;
+  } finally {
+    if (shouldConsume && !matched) {
+      entry.inUse = false;
     }
   }
-
-  return entry.result;
 }
 
 /**
@@ -454,8 +493,12 @@ export function getCachedVerificationResult(tokenOrHash: string): VerificationRe
   if (!tokenOrHash) return null;
   const entry = verificationCache.get(tokenOrHash) || verificationCache.get(`hash_${tokenOrHash}`);
   if (!entry) return null;
+  if (entry.consumed) return null;
   if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
     verificationCache.delete(tokenOrHash);
+    if (entry.sha256Hash) {
+      verificationCache.delete(`hash_${entry.sha256Hash}`);
+    }
     return null;
   }
   return entry.result;

@@ -88,6 +88,7 @@ async function runEvidenceIntegrityTests() {
     category: "Roads & Potholes",
     latitude: 17.3850,
     longitude: 78.4867,
+    consume: false,
   });
   assert(match1 !== null, "Matching evidence must retrieve cached verification result");
   assert.strictEqual(match1.sha256Hash, vResult1.sha256Hash, "Result SHA-256 must match verified evidence");
@@ -292,6 +293,7 @@ async function runEvidenceIntegrityTests() {
     category: "Roads & Potholes",
     latitude: 17.3850,
     longitude: 78.4867,
+    consume: false,
   });
   assert(matchResult !== null, "Legitimate submission evidence must match cached token");
 
