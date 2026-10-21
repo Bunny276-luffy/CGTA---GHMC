@@ -2,6 +2,7 @@ import assert from "assert";
 import { signSession } from "../lib/session";
 import { getRepository } from "../lib/db";
 import { PATCH as statusHandler } from "../app/api/complaints/[id]/status/route";
+import { POST as submitHandler } from "../app/api/complaints/submit/route";
 import { Complaint, User } from "../lib/repositories/types";
 
 // Ensure a consistent auth secret for token signing in tests
@@ -34,12 +35,15 @@ async function runStatusAuthRegressionTests() {
   const originalCreateAuditLog = repo.createAuditLog;
   const originalCreateNotification = repo.createNotification;
   const originalCreateComplaintEvidence = repo.createComplaintEvidence;
+  const originalCreateComplaint = repo.createComplaint;
+  const originalCreateAIReport = repo.createAIReport;
 
   // In-memory complaint ledger for tests
   const complaintsTable = new Map<string, Complaint>();
   const recordedUpdate: { current: { id: string; status: string; options?: any } | null } = {
     current: null,
   };
+  let createComplaintCalls = 0;
 
   // Install test stubs on repository singleton
   repo.getComplaintById = async (id: string): Promise<Complaint | null> => {
@@ -74,6 +78,29 @@ async function runStatusAuthRegressionTests() {
   repo.createAuditLog = async (): Promise<any> => ({ id: "audit-mock" });
   repo.createNotification = async (): Promise<any> => ({ id: "notif-mock" });
   repo.createComplaintEvidence = async (): Promise<any> => ({ id: "evidence-mock" });
+  repo.createComplaint = async (data: any): Promise<Complaint> => {
+    createComplaintCalls++;
+    const id = `ticket-created-${createComplaintCalls}`;
+    const comp: Complaint = {
+      id,
+      tracking_id: `CGTA-2026-SUB${createComplaintCalls}`,
+      title: data.title,
+      description: data.description,
+      category: data.category,
+      status: data.status || "SUBMITTED",
+      latitude: data.latitude,
+      longitude: data.longitude,
+      address: data.address,
+      severity: data.severity,
+      anonymous: data.anonymous,
+      before_photo_url: data.before_photo_url,
+      created_by_id: data.created_by_id,
+      rejection_count: 0,
+    };
+    complaintsTable.set(id, comp);
+    return comp;
+  };
+  repo.createAIReport = async (report: any): Promise<any> => ({ id: "ai-mock", ...report });
 
   try {
     const officer1Headers = await createAuthHeaders({
@@ -603,6 +630,186 @@ async function runStatusAuthRegressionTests() {
     );
     console.log("✅ 5C Passed: Citizen rejected when attempting non-permitted transition");
 
+    // 5D: Citizen owner disputes resolved complaint (1st dispute -> IN_PROGRESS, rejection_count: 1)
+    complaintsTable.set("ticket-citizen-dispute-1", {
+      id: "ticket-citizen-dispute-1",
+      tracking_id: "CGTA-2026-DISP1",
+      title: "Broken water main leaking",
+      description: "Water pooling at intersection",
+      category: "DRAINAGE",
+      status: "RESOLVED",
+      latitude: 17.38,
+      longitude: 78.47,
+      address: "Intersection 5, Hyderabad",
+      severity: "HIGH",
+      anonymous: false,
+      created_by_id: "citizen-1",
+      assigned_officer_id: "officer-101",
+      rejection_count: 0,
+    });
+
+    const req5D = new Request("http://localhost:3000/api/complaints/ticket-citizen-dispute-1/status", {
+      method: "PATCH",
+      headers: citizenOwnerHeaders,
+      body: JSON.stringify({
+        status: "IN_PROGRESS",
+        notes: "Work incomplete. Water is still leaking onto the road.",
+      }),
+    });
+    const res5D = await statusHandler(req5D, { params: Promise.resolve({ id: "ticket-citizen-dispute-1" }) });
+    assert.strictEqual(res5D.status, 200, "Citizen disputing resolution must return 200");
+    const data5D = await res5D.json();
+    assert.strictEqual(data5D.complaint?.status, "IN_PROGRESS", "First dispute must set status to IN_PROGRESS");
+    assert.strictEqual(data5D.complaint?.rejectionCount, 1, "First dispute must set rejection count to 1");
+    assert.strictEqual(recordedUpdate.current?.options?.citizenConfirmed, false, "Dispute must record citizenConfirmed as false");
+    console.log("✅ 5D Passed: Citizen owner successfully disputes resolution (moves to IN_PROGRESS, rejection_count: 1)");
+
+    // 5E: Citizen owner disputes resolved complaint for 2nd time (2nd dispute -> escalates to TPA_REVIEW)
+    complaintsTable.set("ticket-citizen-dispute-2", {
+      id: "ticket-citizen-dispute-2",
+      tracking_id: "CGTA-2026-DISP2",
+      title: "Garbage pile recurring",
+      description: "Waste dumped repeatedly",
+      category: "SANITATION",
+      status: "RESOLVED",
+      latitude: 17.39,
+      longitude: 78.48,
+      address: "Market Corner, Hyderabad",
+      severity: "STANDARD",
+      anonymous: false,
+      created_by_id: "citizen-1",
+      assigned_officer_id: "officer-101",
+      rejection_count: 1, // Already rejected once
+    });
+
+    const req5E = new Request("http://localhost:3000/api/complaints/ticket-citizen-dispute-2/status", {
+      method: "PATCH",
+      headers: citizenOwnerHeaders,
+      body: JSON.stringify({
+        status: "IN_PROGRESS",
+        notes: "Second dispute: trash was never removed. Escalating to supervisor.",
+      }),
+    });
+    const res5E = await statusHandler(req5E, { params: Promise.resolve({ id: "ticket-citizen-dispute-2" }) });
+    assert.strictEqual(res5E.status, 200, "Second dispute must return 200");
+    const data5E = await res5E.json();
+    assert.strictEqual(data5E.complaint?.status, "TPA_REVIEW", "Second dispute must automatically escalate to TPA_REVIEW");
+    assert.strictEqual(data5E.complaint?.rejectionCount, 2, "Second dispute must set rejection count to 2");
+    assert.strictEqual(data5E.escalated, true, "Escalated flag must be true on TPA_REVIEW escalation");
+    console.log("✅ 5E Passed: Second dispute triggers automated escalation to TPA_REVIEW");
+
+    // 5F: Citizen attempts unauthorized transition from RESOLVED (e.g. RESOLVED -> ASSIGNED)
+    const req5F = new Request("http://localhost:3000/api/complaints/ticket-citizen-res/status", {
+      method: "PATCH",
+      headers: citizenOwnerHeaders,
+      body: JSON.stringify({
+        status: "ASSIGNED",
+      }),
+    });
+    const res5F = await statusHandler(req5F, { params: Promise.resolve({ id: "ticket-citizen-res" }) });
+    assert.strictEqual(res5F.status, 403, "Citizen cannot move ticket to ASSIGNED");
+    const data5F = await res5F.json();
+    assert(
+      data5F.message?.includes("Forbidden: citizens cannot move a grievance"),
+      "Message must enforce citizen transition restrictions"
+    );
+    console.log("✅ 5F Passed: Citizen rejected when attempting non-permitted transition from RESOLVED");
+
+    // 5G: Citizen attempts transition on non-existent complaint
+    const req5G = new Request("http://localhost:3000/api/complaints/ticket-does-not-exist/status", {
+      method: "PATCH",
+      headers: citizenOwnerHeaders,
+      body: JSON.stringify({
+        status: "CLOSED",
+      }),
+    });
+    const res5G = await statusHandler(req5G, { params: Promise.resolve({ id: "ticket-does-not-exist" }) });
+    assert.strictEqual(res5G.status, 404, "Transition on non-existent complaint must return 404");
+    const data5G = await res5G.json();
+    assert.strictEqual(data5G.message, "Complaint not found");
+    console.log("✅ 5G Passed: Citizen transition on non-existent complaint returns 404");
+
+    // -------------------------------------------------------------------------
+    // TEST 6: Complaint Submission Validation & Non-Citizen Role Rejection
+    // -------------------------------------------------------------------------
+    console.log("\n--- TEST 6: Complaint Submission Validation & Non-Citizen Role Rejection ---");
+
+    // 6A: Missing headline and description
+    const req6A = new Request("http://localhost:3000/api/complaints/submit", {
+      method: "POST",
+      headers: citizenOwnerHeaders,
+      body: JSON.stringify({
+        title: "",
+        description: "",
+        category: "Roads & Potholes",
+        latitude: 17.385,
+        longitude: 78.486,
+      }),
+    });
+    const res6A = await submitHandler(req6A);
+    assert.strictEqual(res6A.status, 400, "Submission without headline/description must return 400");
+    const data6A = await res6A.json();
+    assert.strictEqual(data6A.message, "A clean headline and description are required.");
+    assert.strictEqual(createComplaintCalls, 0, "No complaint must be persisted on validation failure");
+    console.log("✅ 6A Passed: Missing headline/description rejected with 400, no DB record created");
+
+    // 6B: Invalid grievance category
+    const req6B = new Request("http://localhost:3000/api/complaints/submit", {
+      method: "POST",
+      headers: citizenOwnerHeaders,
+      body: JSON.stringify({
+        title: "Pothole on Main Road",
+        description: "Dangerous pothole near bus stop",
+        category: "INVALID_UNKNOWN_CATEGORY",
+        latitude: 17.385,
+        longitude: 78.486,
+      }),
+    });
+    const res6B = await submitHandler(req6B);
+    assert.strictEqual(res6B.status, 400, "Submission with invalid category must return 400");
+    const data6B = await res6B.json();
+    assert.strictEqual(data6B.message, "Invalid grievance category.");
+    assert.strictEqual(createComplaintCalls, 0, "No complaint must be persisted on category validation failure");
+    console.log("✅ 6B Passed: Invalid category rejected with 400, no DB record created");
+
+    // 6C: Invalid GPS coordinates
+    const req6C = new Request("http://localhost:3000/api/complaints/submit", {
+      method: "POST",
+      headers: citizenOwnerHeaders,
+      body: JSON.stringify({
+        title: "Pothole on Main Road",
+        description: "Dangerous pothole near bus stop",
+        category: "Roads & Potholes",
+        latitude: 999.0, // Invalid latitude
+        longitude: 78.486,
+      }),
+    });
+    const res6C = await submitHandler(req6C);
+    assert.strictEqual(res6C.status, 400, "Submission with invalid latitude must return 400");
+    const data6C = await res6C.json();
+    assert.strictEqual(data6C.message, "Valid GPS coordinates are required.");
+    assert.strictEqual(createComplaintCalls, 0, "No complaint must be persisted on GPS validation failure");
+    console.log("✅ 6C Passed: Invalid GPS coordinates rejected with 400, no DB record created");
+
+    // 6D: Officer role attempting citizen submission is rejected with 403
+    const req6D = new Request("http://localhost:3000/api/complaints/submit", {
+      method: "POST",
+      headers: officer1Headers,
+      body: JSON.stringify({
+        title: "Staff attempting to submit",
+        description: "Officer should not use citizen submission endpoint",
+        category: "Roads & Potholes",
+        latitude: 17.385,
+        longitude: 78.486,
+      }),
+    });
+    const res6D = await submitHandler(req6D);
+    assert.strictEqual(res6D.status, 403, "Officer attempting to submit complaint must receive 403");
+    const data6D = await res6D.json();
+    assert.strictEqual(data6D.message, "Forbidden: your role does not have access to this resource.");
+    assert.strictEqual(createComplaintCalls, 0, "No complaint must be persisted on role rejection");
+    console.log("✅ 6D Passed: Non-citizen role rejected with 403 Forbidden");
+
     console.log("\n=== ALL COMPLAINT STATUS AUTHORIZATION REGRESSION TESTS PASSED ===");
   } finally {
     // Restore original repository methods
@@ -612,6 +819,8 @@ async function runStatusAuthRegressionTests() {
     repo.createAuditLog = originalCreateAuditLog;
     repo.createNotification = originalCreateNotification;
     repo.createComplaintEvidence = originalCreateComplaintEvidence;
+    repo.createComplaint = originalCreateComplaint;
+    repo.createAIReport = originalCreateAIReport;
   }
 }
 

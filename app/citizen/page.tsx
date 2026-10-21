@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { VerificationResult } from "@/lib/verification-engine";
 import { t, SupportedLanguage, LANGUAGE_NAMES } from "@/lib/i18n";
+import { logoutAndRedirect } from "@/lib/client-auth";
 import {
   ShieldCheck,
   PlusCircle,
@@ -27,21 +28,18 @@ import {
   Info
 } from "lucide-react";
 
-interface Complaint {
-  id: string;
-  trackingId: string;
-  title: string;
-  description: string;
-  category: string;
-  status: "SUBMITTED" | "ASSIGNED" | "IN_PROGRESS" | "RESOLVED" | "TPA_REVIEW" | "CLOSED";
-  severity: "EMERGENCY" | "HIGH" | "STANDARD";
-  address: string;
-  beforePhotoUrl: string;
-  resolutionPhotoUrl?: string;
-  rejectionCount: number;
-  createdAt: string;
-  verificationResult?: VerificationResult;
-}
+import {
+  Complaint,
+  SubmissionDraftContext,
+  ProcessSubmissionResult,
+  ProcessStatusUpdateResult,
+  processSubmissionOutcome,
+  processStatusUpdateOutcome,
+  applySubmissionOutcome
+} from "@/lib/citizen-submission";
+
+
+
 
 const CATEGORY_OPTIONS = [
   { id: "Roads & Potholes", label: "Roads & Potholes", desc: "Pothole, damaged asphalt, open manhole" },
@@ -83,6 +81,8 @@ export default function CitizenDashboard() {
   // Grievances State
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [notifications, setNotifications] = useState<string[]>([]);
@@ -232,118 +232,155 @@ export default function CitizenDashboard() {
     setSubmitting(true);
     setSubmissionError(null);
 
-    try {
-      const res = await fetch("/api/complaints/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          description,
-          category,
-          severity,
-          address: address || "Geolocated Site, Municipal Zone",
-          latitude,
-          longitude,
-          beforePhotoUrl: photoPreview || "",
-          photoName: photo.name,
-          exifLat: latitude,
-          exifLng: longitude,
-          exifSoftware: verificationResult?.cameraModel || "Mobile Camera Hardware Sensor",
-          createdById: currentUser?.id || "citizen-1",
-          verificationToken: verificationResult?.verificationToken,
-          sha256Hash: verificationResult?.sha256Hash
-        })
-      });
+    const draftContext: SubmissionDraftContext = {
+      title,
+      description,
+      category,
+      severity,
+      address: address || "Geolocated Site, Municipal Zone",
+      beforePhotoUrl: photoPreview || "",
+      verificationResult
+    };
 
-      const data = await res.json();
-      if (!res.ok && res.status >= 500 && !data.complaint) {
-        throw new Error(data.message || "Failed to submit complaint to server");
+    try {
+      let outcome: ProcessSubmissionResult;
+      try {
+        const res = await fetch("/api/complaints/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            title,
+            description,
+            category,
+            severity,
+            address: address || "Geolocated Site, Municipal Zone",
+            latitude,
+            longitude,
+            beforePhotoUrl: photoPreview || "",
+            photoName: photo.name,
+            exifLat: latitude,
+            exifLng: longitude,
+            exifSoftware: verificationResult?.cameraModel || "Mobile Camera Hardware Sensor",
+            createdById: currentUser?.id,
+            verificationToken: verificationResult?.verificationToken,
+            sha256Hash: verificationResult?.sha256Hash
+          })
+        });
+
+        outcome = await processSubmissionOutcome(res, draftContext);
+      } catch (fetchErr: any) {
+        outcome = await processSubmissionOutcome(
+          fetchErr instanceof Error ? fetchErr : new Error(String(fetchErr?.message || fetchErr || "Network connection failure")),
+          draftContext
+        );
       }
 
-      const trackingId = data.complaint?.trackingId || `CT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      if (outcome.requiresLogin) {
+        logoutAndRedirect(router, "/login");
+        return;
+      }
 
-      const newComplaint: Complaint = {
-        id: data.complaint?.id || "comp-" + Date.now(),
-        trackingId,
-        title: title || `${category} Issue`,
-        description,
-        category,
-        status: (data.complaint?.status as any) || "SUBMITTED",
-        severity,
-        address: address || "Geolocated Site, Municipal Zone",
-        beforePhotoUrl: photoPreview || "",
-        rejectionCount: 0,
-        createdAt: new Date().toISOString(),
-        verificationResult: verificationResult || data.complaint?.verificationResult
-      };
+      const nextState = applySubmissionOutcome(
+        { complaints, successId, submissionError },
+        outcome
+      );
 
-      setComplaints([newComplaint, ...complaints]);
-      setSuccessId(trackingId);
+      setComplaints(nextState.complaints);
+      setSuccessId(nextState.successId);
+      setSubmissionError(nextState.submissionError);
 
-      // Reset form
-      setTitle("");
-      setDescription("");
-      setAddress("");
-      setPhoto(null);
-      setPhotoPreview(null);
-      setVerificationResult(null);
-      setSubmitting(false);
-
+      if (nextState.successId) {
+        // Reset form on verified success
+        setTitle("");
+        setDescription("");
+        setAddress("");
+        setPhoto(null);
+        setPhotoPreview(null);
+        setVerificationResult(null);
+      }
     } catch (err: any) {
-      console.warn("Local grievance creation fallback mode:", err);
-      const trackingId = `CT-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      const newComplaint: Complaint = {
-        id: "comp-" + Date.now(),
-        trackingId,
-        title: title || `${category} Issue`,
-        description,
-        category,
-        status: "SUBMITTED",
-        severity,
-        address: address || "Geolocated Site, Municipal Zone",
-        beforePhotoUrl: photoPreview || "",
-        rejectionCount: 0,
-        createdAt: new Date().toISOString(),
-        verificationResult: verificationResult || undefined
-      };
-
-      setComplaints([newComplaint, ...complaints]);
-      setSuccessId(trackingId);
-      setTitle("");
-      setDescription("");
-      setAddress("");
-      setPhoto(null);
-      setPhotoPreview(null);
-      setVerificationResult(null);
+      setSubmissionError(err?.message || "Failed to submit grievance. Please try again.");
+    } finally {
       setSubmitting(false);
     }
   };
 
-  const handleResolutionConfirmation = (id: string, confirmed: boolean) => {
-    setComplaints(prev => prev.map(c => {
-      if (c.id === id) {
-        if (confirmed) {
-          return { ...c, status: "CLOSED" as const };
-        } else {
-          const nextRejections = c.rejectionCount + 1;
-          const nextStatus = nextRejections >= 2 ? "TPA_REVIEW" : "IN_PROGRESS";
+  const handleResolutionConfirmation = async (id: string, confirmed: boolean) => {
+    if (actionInProgress) return;
+    setActionInProgress(id);
+    setActionError(null);
 
-          setNotifications(prevNotif => [
-            `Grievance ${c.trackingId} resolution disputed. Escalated to Supervisor.`,
-            ...prevNotif
-          ]);
+    const targetStatus = confirmed ? "CLOSED" : "IN_PROGRESS";
+    const notes = confirmed
+      ? "Resolution accepted and closed by citizen"
+      : "Resolution disputed by citizen";
 
+    const currentComplaint = complaints.find(c => c.id === id);
+
+    try {
+      let outcome: ProcessStatusUpdateResult;
+      try {
+        const res = await fetch(`/api/complaints/${id}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            status: targetStatus,
+            notes
+          })
+        });
+
+        outcome = await processStatusUpdateOutcome(res, currentComplaint);
+      } catch (fetchErr: any) {
+        outcome = await processStatusUpdateOutcome(
+          fetchErr instanceof Error ? fetchErr : new Error(String(fetchErr?.message || fetchErr || "Network connection failure")),
+          currentComplaint
+        );
+      }
+
+      if (outcome.requiresLogin) {
+        logoutAndRedirect(router, "/login");
+        return;
+      }
+
+      if (!outcome.success || !outcome.status) {
+        setActionError(outcome.error || "Failed to update resolution status. Please try again.");
+        return;
+      }
+
+      // Update complaints state strictly from server confirmation
+      setComplaints(prev => prev.map(c => {
+        if (c.id === id) {
           return {
             ...c,
-            status: nextStatus as any,
-            rejectionCount: nextRejections
+            status: outcome.status!,
+            rejectionCount: outcome.rejectionCount ?? c.rejectionCount
           };
         }
-      }
-      return c;
-    }));
+        return c;
+      }));
 
-    setSelectedComplaint(null);
+      // Show notification based on server outcome
+      const trackingId = outcome.trackingId || currentComplaint?.trackingId || id;
+      if (confirmed) {
+        setNotifications(prev => [
+          `Grievance ${trackingId} closed. Thank you for confirming resolution.`,
+          ...prev
+        ]);
+      } else {
+        const message = outcome.escalated
+          ? `Grievance ${trackingId} resolution disputed. Escalated to Third-Party Auditor for review.`
+          : `Grievance ${trackingId} resolution disputed. Returned to officer for rework.`;
+        setNotifications(prev => [message, ...prev]);
+      }
+
+      setSelectedComplaint(null);
+    } catch (err: any) {
+      setActionError(err?.message || "Failed to update resolution status. Please try again.");
+    } finally {
+      setActionInProgress(null);
+    }
   };
 
   const copyTrackingId = (id: string) => {
@@ -355,8 +392,7 @@ export default function CitizenDashboard() {
   };
 
   const logout = () => {
-    localStorage.clear();
-    router.push("/login");
+    logoutAndRedirect(router, "/login");
   };
 
   const getStatusBadge = (status: Complaint["status"]) => {
@@ -745,7 +781,7 @@ export default function CitizenDashboard() {
               filteredComplaints.map((c) => (
                 <div
                   key={c.id}
-                  onClick={() => setSelectedComplaint(c)}
+                  onClick={() => { setSelectedComplaint(c); setActionError(null); }}
                   className="p-4 rounded-xl bg-white border border-slate-300 hover:border-blue-600 cursor-pointer transition-all shadow-sm space-y-2"
                 >
                   <div className="flex justify-between items-center">
@@ -770,7 +806,7 @@ export default function CitizenDashboard() {
                       <span className="text-xs font-mono font-bold text-blue-900 block">{selectedComplaint.trackingId}</span>
                       <h3 className="text-sm font-bold text-slate-900">{selectedComplaint.title}</h3>
                     </div>
-                    <button onClick={() => setSelectedComplaint(null)} className="p-2 text-slate-500 hover:text-slate-900 font-bold min-h-[44px] min-w-[44px]">✕</button>
+                    <button onClick={() => { setSelectedComplaint(null); setActionError(null); }} className="p-2 text-slate-500 hover:text-slate-900 font-bold min-h-[44px] min-w-[44px]">✕</button>
                   </div>
 
                   <div className="space-y-3 text-xs">
@@ -790,18 +826,34 @@ export default function CitizenDashboard() {
                         <p className="text-xs text-blue-900 font-bold">
                           Field officer submitted resolution proof. Confirm resolution:
                         </p>
+                        {actionError && (
+                          <div className="p-3 rounded-lg bg-rose-50 border border-rose-300 flex items-center gap-2 text-xs text-rose-900 font-bold">
+                            <AlertTriangle className="h-4 w-4 text-rose-700 flex-shrink-0" />
+                            <span>{actionError}</span>
+                          </div>
+                        )}
                         <div className="grid grid-cols-2 gap-2">
                           <button
+                            type="button"
+                            disabled={actionInProgress === selectedComplaint.id}
                             onClick={() => handleResolutionConfirmation(selectedComplaint.id, true)}
-                            className="min-h-[48px] py-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase shadow-sm"
+                            className="min-h-[48px] py-3 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
                           >
-                            Accept & Close
+                            {actionInProgress === selectedComplaint.id ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : null}
+                            <span>Accept & Close</span>
                           </button>
                           <button
+                            type="button"
+                            disabled={actionInProgress === selectedComplaint.id}
                             onClick={() => handleResolutionConfirmation(selectedComplaint.id, false)}
-                            className="min-h-[48px] py-3 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold text-xs uppercase"
+                            className="min-h-[48px] py-3 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-900 font-bold text-xs uppercase disabled:opacity-50 flex items-center justify-center gap-2"
                           >
-                            Dispute Resolution
+                            {actionInProgress === selectedComplaint.id ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : null}
+                            <span>Dispute Resolution</span>
                           </button>
                         </div>
                       </div>
