@@ -178,8 +178,8 @@ export default function OfficerDashboard() {
       setAuditError("Photographic resolution proof is required.");
       return;
     }
-    if (!fieldNotes || fieldNotes.trim().length < 5) {
-      setAuditError("A field action note is required.");
+    if (!fieldNotes || fieldNotes.trim().length < 10) {
+      setAuditError("A field action note (min 10 characters) is required.");
       return;
     }
 

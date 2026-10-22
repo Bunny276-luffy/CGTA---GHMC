@@ -131,7 +131,11 @@ export interface SlaState {
 /** Deterministic SLA evaluation against the configured policy. */
 export function evaluateSla(createdAt: string | Date | undefined, severity: string): SlaState | null {
   if (!createdAt) return null;
-  const created = new Date(createdAt).getTime();
+  const rawDate =
+    typeof createdAt === "string" && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(createdAt)
+      ? createdAt.replace(" ", "T") + "Z"
+      : createdAt;
+  const created = new Date(rawDate).getTime();
   if (Number.isNaN(created)) return null;
   const policy = getSlaPolicy(severity);
   const ageHours = (Date.now() - created) / 3_600_000;

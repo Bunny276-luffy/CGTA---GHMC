@@ -32,7 +32,7 @@ export default function CivicTracker() {
     setResult(null);
 
     try {
-      const res = await fetch(`/api/complaints/track?id=${query.trim()}`);
+      const res = await fetch(`/api/complaints/track?id=${encodeURIComponent(query.trim().toUpperCase())}`);
       const data = await res.json();
 
       if (!res.ok) {
@@ -70,7 +70,7 @@ export default function CivicTracker() {
             Public Grievance Status Lookup
           </h3>
           <p className="text-xs text-slate-600 font-medium">
-            Enter your official grievance tracking ID (e.g. <span className="font-mono text-blue-800 font-bold">CT-2026-XXXX</span>) to view resolution progress.
+            Enter your official grievance tracking ID (e.g. <span className="font-mono text-blue-800 font-bold">CGTA-2026-XXXX</span>) to view resolution progress.
           </p>
         </div>
 
@@ -80,7 +80,7 @@ export default function CivicTracker() {
             <input
               type="text"
               required
-              placeholder="e.g. CT-2026-1049"
+              placeholder="e.g. CGTA-2026-1049"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="w-full min-h-[46px] pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 bg-white font-mono text-xs text-slate-900 outline-none focus:border-blue-700"
