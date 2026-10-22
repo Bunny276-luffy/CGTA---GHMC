@@ -114,7 +114,7 @@ function downloadStream(
     let redirected = false;
     let ownsTempFile = false;
     let fileStream: fs.WriteStream | null = null;
-    let currentReq: https.ClientRequest | null = null;
+    let currentReq: http.ClientRequest | null = null;
     let currentRes: http.IncomingMessage | null = null;
 
     const cleanup = () => {
