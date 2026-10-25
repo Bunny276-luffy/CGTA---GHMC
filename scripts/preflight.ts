@@ -60,6 +60,13 @@ if (provider === 'sqlite') {
   } else {
     console.log(`✅ DATABASE_URL is set.`);
   }
+  const schemaSql = path.join(process.cwd(), 'schema.sql');
+  if (!fs.existsSync(schemaSql)) {
+    console.log("❌ schema.sql is missing from project root.");
+    hasErrors = true;
+  } else {
+    console.log(`✅ schema.sql exists for PostgreSQL setup.`);
+  }
 }
 
 // 3. Application State Check (Resilience & Config)

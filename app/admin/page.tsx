@@ -72,7 +72,7 @@ export default function AdminDashboard() {
   // Configuration State
   const [geofenceLimit, setGeofenceLimit] = useState(100);
   const [duplicateRadius, setDuplicateRadius] = useState(50);
-  const [configSaved, setConfigSaved] = useState(false);
+  const [jurisdictionData, setJurisdictionData] = useState<any>(null);
   const [assignOfficerId, setAssignOfficerId] = useState("");
 
   // Data State
@@ -98,10 +98,11 @@ export default function AdminDashboard() {
       setCurrentUser(user);
 
       try {
-        const [complaintsRes, overviewRes, healthRes] = await Promise.all([
+        const [complaintsRes, overviewRes, healthRes, configRes] = await Promise.all([
           fetch("/api/complaints", { credentials: "same-origin" }),
           fetch("/api/admin/overview", { credentials: "same-origin" }),
-          fetch("/api/admin/health", { credentials: "same-origin" })
+          fetch("/api/admin/health", { credentials: "same-origin" }),
+          fetch("/api/config", { credentials: "same-origin" })
         ]);
 
         if (complaintsRes.status === 401 || overviewRes.status === 401) {
@@ -130,6 +131,17 @@ export default function AdminDashboard() {
           const hData = await healthRes.json();
           setHealthData(hData);
         }
+
+        if (configRes.ok) {
+          const cfg = await configRes.json();
+          setJurisdictionData(cfg);
+          if (cfg.verification?.gpsToleranceMeters) {
+            setGeofenceLimit(cfg.verification.gpsToleranceMeters);
+          }
+          if (cfg.verification?.duplicateRadiusMeters) {
+            setDuplicateRadius(cfg.verification.duplicateRadiusMeters);
+          }
+        }
       } catch (err) {
         console.warn("Could not load admin data:", err);
       } finally {
@@ -153,11 +165,6 @@ export default function AdminDashboard() {
   };
 
 
-  const handleSaveConfig = (e: React.FormEvent) => {
-    e.preventDefault();
-    setConfigSaved(true);
-    setTimeout(() => setConfigSaved(false), 3000);
-  };
 
   const applyStatusUpdate = async (
     complaintId: string,
@@ -616,43 +623,52 @@ export default function AdminDashboard() {
 
         {/* TAB 5: CONFIGURATION */}
         {activeTab === "config" && (
-          <form onSubmit={handleSaveConfig} className="p-5 rounded-xl bg-white border border-slate-300 shadow-sm space-y-4 max-w-xl text-xs">
-            <h3 className="text-sm font-bold text-slate-900 uppercase">Policy Parameters</h3>
-
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Geofence Distance Tolerance (Meters)</label>
-              <input
-                type="number"
-                value={geofenceLimit}
-                onChange={(e) => setGeofenceLimit(Number(e.target.value))}
-                className="w-full min-h-[44px] px-3 rounded-lg border border-slate-300 bg-white font-medium"
-              />
+          <div className="p-5 rounded-xl bg-white border border-slate-300 shadow-sm space-y-5 max-w-2xl text-xs">
+            <div className="border-b border-slate-200 pb-3">
+              <h3 className="text-sm font-bold text-slate-900 uppercase">Jurisdiction Policy Parameters</h3>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Active parameters enforced across all AI verification, SLA escalation, and geofence routing pipelines.
+                Defined in <code className="font-mono text-blue-900 bg-slate-100 px-1 py-0.5 rounded">config/jurisdiction.config.json</code>.
+              </p>
             </div>
 
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Duplicate Image Search Radius (Meters)</label>
-              <input
-                type="number"
-                value={duplicateRadius}
-                onChange={(e) => setDuplicateRadius(Number(e.target.value))}
-                className="w-full min-h-[44px] px-3 rounded-lg border border-slate-300 bg-white font-medium"
-              />
-            </div>
-
-            {configSaved && (
-              <div className="p-3 rounded-lg bg-emerald-50 text-emerald-900 font-bold flex items-center gap-2">
-                <Check className="h-4 w-4 text-emerald-700" />
-                <span>Policy parameters updated successfully.</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-500">Geofence Distance Tolerance</span>
+                <p className="text-base font-bold text-slate-900 font-mono">{geofenceLimit} meters</p>
+                <p className="text-[10px] text-slate-500">Maximum drift permitted between officer resolution GPS and incident site.</p>
               </div>
-            )}
 
-            <button
-              type="submit"
-              className="py-3 px-5 rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-bold uppercase min-h-[44px]"
-            >
-              Save Configuration
-            </button>
-          </form>
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-500">Duplicate Search Radius</span>
+                <p className="text-base font-bold text-slate-900 font-mono">{duplicateRadius} meters</p>
+                <p className="text-[10px] text-slate-500">Spatial radius for pHash duplicate and related-grievance clustering.</p>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-500">Manual Review Trust Threshold</span>
+                <p className="text-base font-bold text-slate-900 font-mono">{jurisdictionData?.verification?.manualReviewTrustThreshold ?? 60}%</p>
+                <p className="text-[10px] text-slate-500">Grievances below this score route automatically to supervisor review.</p>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-500">High Trust Verification Threshold</span>
+                <p className="text-base font-bold text-slate-900 font-mono">{jurisdictionData?.verification?.highTrustThreshold ?? 70}%</p>
+                <p className="text-[10px] text-slate-500">Verified evidence exceeding this threshold qualifies as high trust.</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-900 text-xs space-y-1">
+              <p className="font-bold flex items-center gap-1.5">
+                <ShieldCheck className="h-4 w-4 text-blue-700" />
+                <span>Deterministic Configuration Engine</span>
+              </p>
+              <p className="text-[11px] leading-relaxed text-blue-800">
+                To guarantee audit reproducibility and prevent runtime tampering, municipal policy rules are immutable deployment profiles.
+                Updates are version-controlled in the repository configuration engine.
+              </p>
+            </div>
+          </div>
         )}
 
       </main>

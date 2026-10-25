@@ -48,6 +48,15 @@ async function runCaptchaSecurityTests() {
   assert(res2.message?.includes("unconfigured"), "Error message should cite unconfigured protection");
   console.log("✅ Scenario 2 Passed: Unconfigured production deployment fails-closed with 500");
 
+  // Scenario 2b: Production with explicit CAPTCHA_ENABLED=false permits operation
+  resetEnv();
+  (process.env as any).NODE_ENV = "production";
+  process.env.CAPTCHA_ENABLED = "false";
+  const res2b = await verifyCaptchaToken(null);
+  assert.strictEqual(res2b.ok, true, "Production with explicit CAPTCHA_ENABLED=false must pass gracefully");
+  assert.strictEqual(res2b.provider, "none");
+  console.log("✅ Scenario 2b Passed: Production deployment with CAPTCHA_ENABLED=false permits execution");
+
   // Scenario 3: Strict mode with missing token
   resetEnv();
   (process.env as any).NODE_ENV = "development";

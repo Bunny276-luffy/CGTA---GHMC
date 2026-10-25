@@ -127,6 +127,7 @@ export interface DatabaseRepository {
       resolutionPhotoUrl?: string;
       rejectionCount?: number;
       citizenConfirmed?: boolean;
+      closedByTpa?: boolean;
     }
   ): Promise<void>;
 

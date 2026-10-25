@@ -166,6 +166,7 @@ export class SQLiteRepository implements DatabaseRepository {
       resolutionPhotoUrl?: string;
       rejectionCount?: number;
       citizenConfirmed?: boolean;
+      closedByTpa?: boolean;
     }
   ): Promise<void> {
     const sets: string[] = ['status = ?', 'updated_at = CURRENT_TIMESTAMP'];
@@ -186,6 +187,10 @@ export class SQLiteRepository implements DatabaseRepository {
     if (options?.citizenConfirmed !== undefined) {
       sets.push('citizen_confirmed = ?');
       params.push(options.citizenConfirmed ? 1 : 0);
+    }
+    if (options?.closedByTpa !== undefined) {
+      sets.push('closed_by_tpa = ?');
+      params.push(options.closedByTpa ? 1 : 0);
     }
 
     params.push(complaintId);

@@ -220,6 +220,7 @@ export class PostgresRepository implements DatabaseRepository {
       resolutionPhotoUrl?: string;
       rejectionCount?: number;
       citizenConfirmed?: boolean;
+      closedByTpa?: boolean;
     }
   ): Promise<void> {
     const pool = getPool();
@@ -242,6 +243,10 @@ export class PostgresRepository implements DatabaseRepository {
     if (options?.citizenConfirmed !== undefined) {
       sets.push(`citizen_confirmed = $${idx++}`);
       params.push(options.citizenConfirmed);
+    }
+    if (options?.closedByTpa !== undefined) {
+      sets.push(`closed_by_tpa = $${idx++}`);
+      params.push(options.closedByTpa);
     }
 
     params.push(complaintId);

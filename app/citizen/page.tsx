@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { VerificationResult } from "@/lib/verification-engine";
 import { t, SupportedLanguage, LANGUAGE_NAMES } from "@/lib/i18n";
-import { logoutAndRedirect } from "@/lib/client-auth";
+import { fetchSessionUser, logoutAndRedirect } from "@/lib/client-auth";
 import {
   ShieldCheck,
   PlusCircle,
@@ -90,25 +90,15 @@ export default function CitizenDashboard() {
 
   useEffect(() => {
     setMounted(true);
-    let user;
-    try {
-      const userStr = localStorage.getItem("user");
-      if (!userStr) {
-        router.push("/login");
-        return;
-      }
-      user = JSON.parse(userStr);
-      if (!user || user.role !== "CITIZEN") {
+
+    const bootstrap = async () => {
+      const user = await fetchSessionUser(["CITIZEN"]);
+      if (!user) {
         router.push("/login");
         return;
       }
       setCurrentUser(user);
-    } catch (e) {
-      router.push("/login");
-      return;
-    }
 
-    const fetchComplaints = async () => {
       try {
         const response = await fetch(`/api/complaints/track?userId=${user.id}`);
         if (response.ok) {
@@ -124,7 +114,7 @@ export default function CitizenDashboard() {
       }
     };
 
-    fetchComplaints();
+    bootstrap();
   }, [router]);
 
   const handleFetchCurrentLocation = () => {
@@ -405,6 +395,8 @@ export default function CitizenDashboard() {
         return <span className="px-2.5 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> [● {t("status.in_progress", lang)}]</span>;
       case "ASSIGNED":
         return <span className="px-2.5 py-1 rounded-md bg-indigo-100 text-indigo-800 border border-indigo-300 font-bold text-xs flex items-center gap-1"><Info className="h-3.5 w-3.5" /> [● {t("status.assigned", lang)}]</span>;
+      case "TPA_REVIEW":
+        return <span className="px-2.5 py-1 rounded-md bg-purple-100 text-purple-800 border border-purple-300 font-bold text-xs flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> [! {t("status.tpa_review", lang)}]</span>;
       default:
         return <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 border border-slate-300 font-bold text-xs flex items-center gap-1"><Info className="h-3.5 w-3.5" /> [● {t("status.submitted", lang)}]</span>;
     }

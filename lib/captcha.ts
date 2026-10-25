@@ -26,11 +26,11 @@ export async function verifyCaptchaToken(
   const isStrict = process.env.CAPTCHA_STRICT === "true";
 
   // Determine if CAPTCHA protection is required:
-  // 1. Running in production environment (always required)
+  // 1. Running in production environment (unless explicitly disabled via CAPTCHA_ENABLED=false)
   // 2. Explicitly enabled via CAPTCHA_ENABLED=true
   // 3. Explicitly strict via CAPTCHA_STRICT=true
   // 4. Secret key is configured
-  const isRequired = isProduction || isEnabled || isStrict || Boolean(secretKey);
+  const isRequired = !isDisabledExplicitly && (isProduction || isEnabled || isStrict || Boolean(secretKey));
 
   // If CAPTCHA is not required and not configured, permit local development/test execution
   if (!isRequired && (!secretKey || isDisabledExplicitly)) {

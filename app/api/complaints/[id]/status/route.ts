@@ -73,6 +73,7 @@ export async function PATCH(
     resolutionPhotoUrl?: string;
     rejectionCount?: number;
     citizenConfirmed?: boolean;
+    closedByTpa?: boolean;
   } = {};
   const notes = cleanText(body.notes ?? "", 500);
   let geofenceReport: { distanceMeters: number; toleranceMeters: number; withinTolerance: boolean } | null = null;
@@ -81,6 +82,11 @@ export async function PATCH(
 
   // ---- Role & transition authorization -------------------------------------
   if (role === "ADMIN" || role === "DEPT_HEAD") {
+    // Record supervisor audit closure when resolving/closing from TPA review
+    if (currentStatus === "TPA_REVIEW" && nextStatus === "CLOSED") {
+      options.closedByTpa = true;
+    }
+
     // Administrators may move the ledger to any state, optionally assigning an officer.
     if (typeof body.assignedOfficerId === "string" && body.assignedOfficerId) {
       if (body.assignedOfficerId.length > 64) {

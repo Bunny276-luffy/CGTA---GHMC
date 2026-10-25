@@ -13,8 +13,12 @@ EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
--- Enable UUID extension if not already enabled
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- Enable UUID extension if not already enabled (safely ignored if non-superuser in cloud environments)
+DO $$ BEGIN
+    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+EXCEPTION
+    WHEN OTHERS THEN null;
+END $$;
 
 -- Users Table
 CREATE TABLE IF NOT EXISTS users (
@@ -121,3 +125,10 @@ CREATE INDEX IF NOT EXISTS idx_system_errors_timestamp ON system_errors(timestam
 CREATE INDEX IF NOT EXISTS idx_system_errors_severity ON system_errors(severity);
 CREATE INDEX IF NOT EXISTS idx_ai_reports_image_sha256 ON ai_reports(image_sha256);
 CREATE INDEX IF NOT EXISTS idx_ai_reports_image_phash ON ai_reports(image_phash);
+
+-- Ensure backward-compatible columns exist on older tables without data loss
+ALTER TABLE complaints ADD COLUMN IF NOT EXISTS rejection_count INT DEFAULT 0;
+ALTER TABLE complaints ADD COLUMN IF NOT EXISTS citizen_confirmed BOOLEAN DEFAULT FALSE;
+ALTER TABLE complaints ADD COLUMN IF NOT EXISTS closed_by_tpa BOOLEAN DEFAULT FALSE;
+ALTER TABLE ai_reports ADD COLUMN IF NOT EXISTS image_sha256 VARCHAR(64);
+ALTER TABLE ai_reports ADD COLUMN IF NOT EXISTS image_phash VARCHAR(64);

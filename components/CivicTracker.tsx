@@ -47,18 +47,22 @@ export default function CivicTracker() {
     }
   };
 
-  const getStatusStep = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case "SUBMITTED": return 1;
-      case "ASSIGNED": return 2;
-      case "IN_PROGRESS": return 3;
-      case "RESOLVED": return 4;
-      case "CLOSED": return 5;
-      default: return 1;
+      case "CLOSED":
+        return <span className="px-3 py-1 rounded bg-emerald-50 border border-emerald-300 font-bold text-xs text-emerald-800">Closed &amp; Verified</span>;
+      case "RESOLVED":
+        return <span className="px-3 py-1 rounded bg-blue-50 border border-blue-300 font-bold text-xs text-blue-800">Resolved (Pending Confirmation)</span>;
+      case "IN_PROGRESS":
+        return <span className="px-3 py-1 rounded bg-amber-50 border border-amber-300 font-bold text-xs text-amber-800">Work In Progress</span>;
+      case "ASSIGNED":
+        return <span className="px-3 py-1 rounded bg-indigo-50 border border-indigo-300 font-bold text-xs text-indigo-800">Assigned to Officer</span>;
+      case "TPA_REVIEW":
+        return <span className="px-3 py-1 rounded bg-purple-50 border border-purple-300 font-bold text-xs text-purple-800">Under Supervisor Audit</span>;
+      default:
+        return <span className="px-3 py-1 rounded bg-slate-100 border border-slate-300 font-bold text-xs text-slate-800">Submitted</span>;
     }
   };
-
-  const currentStep = result ? getStatusStep(result.status) : 0;
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-8">
@@ -112,9 +116,7 @@ export default function CivicTracker() {
               <span className="text-xs font-mono font-bold text-blue-900 block">{result.tracking_id}</span>
               <h3 className="text-base font-bold text-slate-900">{result.title}</h3>
             </div>
-            <span className="px-3 py-1 rounded bg-slate-100 border border-slate-300 font-bold text-xs text-slate-800">
-              {result.status}
-            </span>
+            {getStatusBadge(result.status)}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-medium text-slate-800">

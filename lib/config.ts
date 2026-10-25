@@ -102,7 +102,8 @@ export function getPublicConfig() {
       Object.entries(cfg.slaPolicies).map(([k, v]) => [k, v.hours])
     ),
     escalationRules: cfg.escalationRules,
-    languages: cfg.languages
+    languages: cfg.languages,
+    verification: cfg.verification
   };
 }
 
